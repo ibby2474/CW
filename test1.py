@@ -15,10 +15,6 @@ __generated_with = "0.19.11"
 app = marimo.App(width="medium")
 
 
-# ─────────────────────────────────────────────
-# CELL 1 — IMPORTS
-# ─────────────────────────────────────────────
-
 @app.cell
 def _():
     import marimo as mo
@@ -28,35 +24,19 @@ def _():
     import numpy as np
     return mo, pd, px, go, np
 
-
-# ─────────────────────────────────────────────
-# CELL 2 — TITLE
-# ─────────────────────────────────────────────
-
 @app.cell
 def _(mo):
     mo.md(r"""
     ---
 
-    ## 📈 S&P 500 Historical Price Dashboard
+    ## S&P 500 Historical Price Dashboard
 
     - An interactive dashboard exploring **monthly S&P 500 index prices** from **January 2020 to March 2026**
     - Covers price trends, monthly returns, volatility, and drawdown analysis
-
-    > **How to run as a web app:**
-    > ```bash
-    > marimo run sp500_dashboard.py --sandbox
-    > ```
-    > Then open the `PORTS` tab and click the 🌐 globe icon next to `Marimo App (2718)`.
-
     ---
     """)
     return
 
-
-# ─────────────────────────────────────────────
-# CELL 3 — LOAD DATA
-# ─────────────────────────────────────────────
 
 @app.cell
 def _(mo):
@@ -68,48 +48,47 @@ def _(mo):
 
 @app.cell
 def _(pd, np):
-    # ── Load the CSV (same folder as the notebook) ────────────────────────
+    # ── Load the CSV
     df = pd.read_csv("https://raw.githubusercontent.com/ibby2474/CW/main/S%26P%20500%20Historical%20Data%20(1).csv")
 
-    # ── Strip BOM character from column names if present ─────────────────
+    # This line of code removes any leading or trailing whitespace characters from the column names in the DataFrame and the specific string '/ufeff' from the column names if it exists. 
     df.columns = df.columns.str.strip().str.replace('\ufeff', '', regex=False)
 
-    # ── Clean numeric columns (remove commas from price strings) ─────────
+    # This line of code removes commas from the values and replaces them, thereby converting them into numeric (float) data through this process.
     for col in ['Price', 'Open', 'High', 'Low']:
         df[col] = df[col].str.replace(',', '', regex=False).astype(float)
 
-    # ── Clean Change % column (remove % sign and convert to float) ───────
+    # This line of code removes the % symbol from the column called change and repalces it, thereby converting it to a float value during the process.
     df['Change_Pct'] = df['Change %'].str.replace('%', '', regex=False).astype(float)
 
-    # ── Parse Date column to datetime ────────────────────────────────────
+     # This line of code converts the date column in the DataFrame into a datetime format, whereby the format of the date follwos the pattern/structure of month/day/year.
+        df['Date'] = pd.to_datetime(df['Date'], format='%m/%d/%Y')
     df['Date'] = pd.to_datetime(df['Date'], format='%m/%d/%Y')
 
-    # ── Sort chronologically (oldest first) ──────────────────────────────
+     # This line of code organsies and sorts the dataset by date and resets the index numbers of the DataFrame
     df = df.sort_values('Date').reset_index(drop=True)
 
-    # ── Derived columns ───────────────────────────────────────────────────
-
-    # Year and Month labels for grouping
+# These 4 lines of code below isloate and extract the month,year, year month and month label from the column titled date and creates new columns for each individual extracted column within the DataFrame.
     df['Year']       = df['Date'].dt.year
     df['Month']      = df['Date'].dt.month
     df['Month_Label'] = df['Date'].dt.strftime('%b')   # e.g. 'Jan', 'Feb'
     df['YearMonth']  = df['Date'].dt.strftime('%Y-%m')
 
-    # Monthly range (High - Low)  — measures intra-month volatility
+# This line of code creates a brand new column titled Monthly_Range within the DataFrame. This column is designed to calculate the stock price range on a monthly basis by subtracting the low price form the hgh price for each entry in the dataset, thereby measuring volatility.
     df['Monthly_Range'] = df['High'] - df['Low']
 
-    # Cumulative return from the very first date in the dataset
+# These 3 lines of code below create two new columns within the DataFrame. One is titled Cumulative_Return_Pct and calculates the cumulative return percentage through a comparison metric between the intial and final price  in the dataset, which is stored in the variable first_price. The other column is called Rolling_12m_Avg and calculates the stock price rolling avaerge numeric value over a time frame of 12 months, thereby showing the annual average price trend and is a long-term metric.
     first_price      = df['Price'].iloc[0]
     df['Cumulative_Return_Pct'] = ((df['Price'] - first_price) / first_price) * 100
 
     # Rolling 12-month price: the average closing price over the past 12 months
     df['Rolling_12m_Avg'] = df['Price'].rolling(window=12).mean()
 
-    # Drawdown from rolling maximum (shows how far the index is below its peak)
+      # These lines of code below identify and label the months as eitehr positive or negative based on the motnhly % change in price.
     df['Rolling_Max']     = df['Price'].cummax()
     df['Drawdown_Pct']    = ((df['Price'] - df['Rolling_Max']) / df['Rolling_Max']) * 100
 
-    # Label: positive or negative month
+ # These few lines of code print out the dataset summary in addition to the date rnage and total number of observations on a monthly basis.
     df['Return_Sign'] = df['Change_Pct'].apply(
         lambda x: 'Positive' if x >= 0 else 'Negative'
     )
@@ -118,11 +97,6 @@ def _(pd, np):
           f"{df['Date'].min().strftime('%b %Y')} to {df['Date'].max().strftime('%b %Y')}.")
     df
     return df, first_price
-
-
-# ─────────────────────────────────────────────
-# CELL 4 — UI CONTROLS
-# ─────────────────────────────────────────────
 
 @app.cell
 def _(mo):
@@ -134,7 +108,7 @@ def _(mo):
 
 @app.cell
 def _(df, mo):
-    # Year range slider — lets user zoom into a specific period
+    #This block of code below creates a year range slider which allows the interactive dashboard users to select a specific range of years to specifically filter the visualisations and dataset
     all_years = sorted(df['Year'].unique().tolist())
 
     year_range_slider = mo.ui.range_slider(
@@ -145,7 +119,7 @@ def _(df, mo):
         label="**Select Year Range:**"
     )
 
-    # Dropdown to choose which price series to display on the main line chart
+     #All of these lines of code below when executed create a dropdown menu, allowing users of the interactive dashboard to slsect/choose whcih specific price series to display in the visualisations like the main line chart in particular. The different options include closing price, monthly high, monthly low and opening price.
     price_series_dropdown = mo.ui.dropdown(
         options={
             'Closing Price':    'Price',
@@ -161,27 +135,23 @@ def _(df, mo):
     return year_range_slider, price_series_dropdown
 
 
-# ─────────────────────────────────────────────
-# CELL 5 — REACTIVE FILTER
-# ─────────────────────────────────────────────
 
 @app.cell
 def _(mo):
     mo.md(r"""
-    #### 3. Set Selector to **Filter Data Reactively** (`.isin` / range filter)
+
     """)
     return
 
 
 @app.cell
 def _(df, year_range_slider):
-    # Re-runs automatically when the year slider changes
+   # These few lines of code below adapts when the year slider changes by re-running automatically
     df_filtered = df[
         (df['Year'] >= year_range_slider.value[0]) &
         (df['Year'] <= year_range_slider.value[1])
     ].copy()
 
-    # Key metrics from the filtered data
     n_months       = len(df_filtered)
     price_start    = df_filtered['Price'].iloc[0]  if n_months > 0 else 0
     price_end      = df_filtered['Price'].iloc[-1] if n_months > 0 else 0
@@ -195,20 +165,15 @@ def _(df, year_range_slider):
             best_month, worst_month)
 
 
-# ─────────────────────────────────────────────
-# CELL 6 — VISUALISATIONS
-# ─────────────────────────────────────────────
-
 @app.cell
 def _(mo):
     mo.md(r"""
-    #### 4. Create the **Interactive Plots** on the Dashboard
+    #### #this piece of code is going to be the visulation part of the code.
+# im going to create a notebook cell that renders markdown content for a dashboard interface and making interactive plots.
     """)
     return
 
-
-# ── Plot 1: Main price line chart ────────────────────────────────────────────
-
+#this is gonna be the main price line chart of the S&P500 over the last 6 years starting from 2020
 @app.cell
 def _(df_filtered, px, go, price_series_dropdown):
     _col   = price_series_dropdown.value
@@ -221,6 +186,8 @@ def _(df_filtered, px, go, price_series_dropdown):
         'Monthly Low':   'Low',
     }.items() if v == _col][0]
 
+# this has created a dropdown menu where i selected a closing price as my label because when i ran the code waith just price it didnt work due to having a collumn in the csv file called price already.
+# then i linked them all to a short collumn with price and open, read vaule of selection and found matching label using it for chart title
     fig_line = px.line(
         df_filtered,
         x='Date',
@@ -232,25 +199,12 @@ def _(df_filtered, px, go, price_series_dropdown):
         height=480
     )
 
-    # Overlay 12-month rolling average (only where it has values)
-    _roll_df = df_filtered.dropna(subset=['Rolling_12m_Avg'])
-    if not _roll_df.empty:
-        fig_line.add_trace(
-            go.Scatter(
-                x=_roll_df['Date'],
-                y=_roll_df['Rolling_12m_Avg'],
-                mode='lines',
-                name='12-Month Rolling Avg',
-                line=dict(color='orange', dash='dash', width=1.5)
-            )
-        )
-
     fig_line.update_layout(title=dict(y=0.97, x=0, xanchor='left'), legend=dict(x=0.01, y=0.99))
     print(" ")
     return (fig_line,)
 
-
-# ── Plot 2: Monthly % change bar chart ───────────────────────────────────────
+# now i am going to do a bar chart with monthly percentage change. 
+# creating a dictionary for the colour map the label Positive to green #2ecc71 and the label Negative to red #e74c3c.
 
 @app.cell
 def _(df_filtered, px):
@@ -268,7 +222,7 @@ def _(df_filtered, px):
         width=900,
         height=460
     )
-    # Add a zero line for reference
+    # now i am gonna add a line at the base value which is 0 to make a reference 
     fig_bar.add_hline(y=0, line_color='black', line_width=0.8)
     fig_bar.update_layout(
         xaxis_tickangle=-45,
@@ -278,8 +232,7 @@ def _(df_filtered, px):
     print(" ")
     return (fig_bar,)
 
-
-# ── Plot 3: Cumulative return line ────────────────────────────────────────────
+#now i am gonna use the data to create a cumulative return line
 
 @app.cell
 def _(df_filtered, px):
@@ -293,15 +246,12 @@ def _(df_filtered, px):
         width=900,
         height=460
     )
-    # Shade area under the line
-    fig_cumret.update_traces(fill='tozeroy', fillcolor='rgba(46,204,113,0.15)')
-    fig_cumret.add_hline(y=0, line_dash='dash', line_color='grey', line_width=0.8)
-    fig_cumret.update_layout(title=dict(y=0.97, x=0, xanchor='left'))
+
     print(" ")
     return (fig_cumret,)
 
 
-# ── Plot 4: Drawdown chart ────────────────────────────────────────────────────
+# now i am gonna do a drawndown chart to show how far a portfolio or asset price falls from its previous peak over time
 
 @app.cell
 def _(df_filtered, px):
@@ -322,7 +272,7 @@ def _(df_filtered, px):
     return (fig_drawdown,)
 
 
-# ── Plot 5: Intra-month range (High - Low) violin by year ─────────────────────
+#I create a violin chart using to show the distribution of Monthly_Range values for each Year including all data points 
 
 @app.cell
 def _(df_filtered, px):
@@ -345,7 +295,7 @@ def _(df_filtered, px):
     return (fig_violin,)
 
 
-# ── Plot 6: Monthly return heatmap (Month vs Year) ───────────────────────────
+#now doing a monthly return heatmap to show the average monthly return for each month and year. i will use a pivot table to reshape the data and then use plotly express to create a heatmap. ill format the chart with titles, axis labels, color scale, and text annotations before returning the figure so the dashboard displays the plot
 
 @app.cell
 def _(df_filtered, px, pd):
@@ -376,7 +326,7 @@ def _(df_filtered, px, pd):
     return (fig_heatmap,)
 
 
-# ── Plot 7: Candlestick OHLC chart ───────────────────────────────────────────
+#now i am gonna do a candle stick chart to show the S&P 500 monthly data. ill format the chart with titles, axis labels, layout settings, and remove the range slider before returning the figure so the dashboard displays the plot
 
 @app.cell
 def _(df_filtered, go):
@@ -406,14 +356,12 @@ def _(df_filtered, go):
     return (fig_candle,)
 
 
-# ─────────────────────────────────────────────
-# CELL 7 — DASHBOARD LAYOUT
-# ─────────────────────────────────────────────
+
 
 @app.cell
 def _(mo):
     mo.md(r"""
-    #### 5. Define the **Dashboard Layout** (using `mo.md()`)
+    #### Dashboard Layout
     """)
     return
 
@@ -429,7 +377,7 @@ def _(
     fig_drawdown, fig_violin, fig_heatmap, fig_candle
 ):
     dashboard = mo.md(f"""
-# 📈 S&P 500 Historical Price Dashboard
+#  S&P 500 Historical Price Dashboard
 
 Interactive analysis of **monthly S&P 500 index performance** from January 2020 to March 2026.
 
@@ -456,7 +404,7 @@ Interactive analysis of **monthly S&P 500 index performance** from January 2020 
 
 ---
 
-## 1️⃣  Price Trend + 12-Month Rolling Average
+## 1. Price Trend + 12-Month Rolling Average
 
 *Use the dropdown above to switch between Closing, Opening, High, or Low price series.  
 The orange dashed line is the 12-month rolling average.*
@@ -465,7 +413,7 @@ The orange dashed line is the 12-month rolling average.*
 
 ---
 
-## 2️⃣  Monthly OHLC Candlestick Chart
+## 2. Monthly OHLC Candlestick Chart
 
 *Shows the Open, High, Low, and Close for each month.  
 Green candles = month closed higher than it opened; red = lower.*
@@ -474,7 +422,7 @@ Green candles = month closed higher than it opened; red = lower.*
 
 ---
 
-## 3️⃣  Monthly % Change
+## 3. Monthly % Change
 
 *Green bars = positive months; red bars = negative months.*
 
@@ -482,7 +430,7 @@ Green candles = month closed higher than it opened; red = lower.*
 
 ---
 
-## 4️⃣  Monthly Return Heatmap
+## 4.  Monthly Return Heatmap
 
 *Each cell shows the % return for that month and year.  
 Green = strong gains; red = losses.*
@@ -491,7 +439,7 @@ Green = strong gains; red = losses.*
 
 ---
 
-## 5️⃣  Cumulative Return from January 2020
+## 5.  Cumulative Return from January 2020
 
 *How much has a dollar invested in January 2020 grown by each month?*
 
@@ -499,7 +447,7 @@ Green = strong gains; red = losses.*
 
 ---
 
-## 6️⃣  Drawdown from Rolling Peak
+## 6.  Drawdown from Rolling Peak
 
 *How far below its all-time high was the S&P 500 each month?  
 The COVID crash (March 2020) and the 2022 bear market are clearly visible.*
@@ -508,7 +456,7 @@ The COVID crash (March 2020) and the 2022 bear market are clearly visible.*
 
 ---
 
-## 7️⃣  Monthly Price Range (High − Low) by Year
+## 7.   Monthly Price Range (High − Low) by Year
 
 *Higher violin = more intra-month volatility. Points show individual months.*
 
@@ -520,14 +468,11 @@ The COVID crash (March 2020) and the 2022 bear market are clearly visible.*
     return (dashboard,)
 
 
-# ─────────────────────────────────────────────
-# CELL 8 — DISPLAY
-# ─────────────────────────────────────────────
 
 @app.cell
 def _(mo):
     mo.md(r"""
-    #### 6. **Display** the Dashboard
+    # 6. Display the Dashboard
 
     - Try changing the **year range** slider to zoom in on the 2022 bear market or the 2020 COVID crash
     - Switch the **price series** dropdown to compare Opening vs Closing prices
