@@ -1116,7 +1116,7 @@ function bootApp() {
   document.getElementById('g-cal').value   = goals.calories;
   document.getElementById('g-prot').value  = goals.protein;
   document.getElementById('g-water').value = goals.water;
-  const apiKey = DB.get(PK('apikey')) || 'AIzaSyAtNiRg9RmjxPbvgFSirUl1Qm7TcP-l1hg';
+  const apiKey = DB.get(PK('apikey')) || 'AIzaSyA1vuraiPLGfiArlKFTgRamNCkXi-xwP_4';
   if (!DB.get(PK('apikey'))) DB.set(PK('apikey'), apiKey);
   document.getElementById('g-apikey').value = apiKey;
   const times = DB.get(PK('reminderTimes')) || {};
@@ -1415,7 +1415,7 @@ async function handleLabelFile(e) {
 }
 
 async function analyseLabel(dataUrl) {
-  const apiKey = DB.get(PK('apikey')) || 'YOUR_GEMINI_API_KEY_HERE';
+  const apiKey = DB.get(PK('apikey')) || 'AIzaSyA1vuraiPLGfiArlKFTgRamNCkXi-xwP_4';
   if (!DB.get(PK('apikey'))) DB.set(PK('apikey'), apiKey);
   if (!apiKey) {
     document.getElementById('log-err').style.display = 'block';
@@ -1463,7 +1463,7 @@ async function analyseLabel(dataUrl) {
 }
 
 async function analyseImage(dataUrl) {
-  const apiKey = DB.get(PK('apikey')) || 'YOUR_GEMINI_API_KEY_HERE';
+  const apiKey = DB.get(PK('apikey')) || 'AIzaSyA1vuraiPLGfiArlKFTgRamNCkXi-xwP_4';
   if (!DB.get(PK('apikey'))) DB.set(PK('apikey'), apiKey);
   if (!apiKey) {
     document.getElementById('log-err').style.display = 'block';
@@ -1656,7 +1656,7 @@ async function recalcMacros() {
 
   if (!items.length) { showToast('Add at least one ingredient with a weight'); return; }
 
-  const apiKey = DB.get(PK('apikey')) || 'YOUR_GEMINI_API_KEY_HERE';
+  const apiKey = DB.get(PK('apikey')) || 'AIzaSyA1vuraiPLGfiArlKFTgRamNCkXi-xwP_4';
   if (!DB.get(PK('apikey'))) DB.set(PK('apikey'), apiKey);
   if (!apiKey) { showToast('⚠️ API key needed for recalculation'); return; }
 
