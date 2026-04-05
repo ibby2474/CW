@@ -1116,7 +1116,7 @@ function bootApp() {
   document.getElementById('g-cal').value   = goals.calories;
   document.getElementById('g-prot').value  = goals.protein;
   document.getElementById('g-water').value = goals.water;
-  const apiKey = DB.get(PK('apikey')) || '';
+  const apiKey = DB.get(PK('apikey')) || 'AIzaSyBMOdvUH5LjgWW58J7l02nfU04k_JhoDnk';
   document.getElementById('g-apikey').value = apiKey;
   const times = DB.get(PK('reminderTimes')) || {};
   if (times.breakfast) document.getElementById('t-breakfast').value = times.breakfast;
