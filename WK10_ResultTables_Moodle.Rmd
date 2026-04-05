@@ -1,0 +1,254 @@
+---
+title: "Week 10: Result Tables"
+output: html_notebook
+---
+
+
+# Load required libraries
+```{r}
+
+library(dplyr)
+library(tidyr)
+
+```
+
+
+# Load data (Two methods)
+```{r}
+
+# Read from csv file
+ESGscore_TobinsQ <- read.csv("public/ESGscore_TobinsQ_Moodle.csv")
+
+# Load data previously saved in R native format (.RData)
+load("public/ESG_data_Moodle.RData")
+# Note: ESG score data from Ch.5 of https://www.greenfinance.education"
+
+```
+
+
+# Merge datasets
+```{r}
+
+ESG_data_new <- ESG_data |> 
+  mutate(date = as.character(date)) |>
+  left_join(ESGscore_TobinsQ, by = c("instrument" = "tic", "date" = "datadate")) |>
+  mutate(
+    at_pos = ifelse(at > 0, at, NA), # Replace non-positive 'at' values with NA
+    ceq_pos = ifelse(ceq > 0, ceq, NA), # Replace non-positive 'ceq' values with NA
+    q = (prcc_f * csho + dltt + dlc) / at_pos, # Tobin's Q calculation 
+    ESGscore = esg_metric,
+    Firm_Size = log(at), 
+    Leverage = (dltt + dlc) / ceq_pos, 
+    Year = fyear,
+    Industry = sich,
+    ) |> 
+  select(source, q, ESGscore, Firm_Size, Leverage, Year, Industry) |>
+  drop_na() # Drop any remaining rows with NA values in the selected columns
+
+ESG_data_B <- ESG_data_new |>
+  filter(source == "Provider_B") |>
+  select(-source) # Remove 'source' column as it's no longer needed
+
+ESG_data_A <- ESG_data_new |>
+  filter(source == "Provider_A") |>
+  select(-source)
+
+# Keep only the merged dataset to conserve memory
+rm(ESG_data_new, ESG_data, ESGscore_TobinsQ) # remove data no longer needed
+gc() # Garbage collection to free up memory
+
+```
+
+
+# Summary statistics of data
+```{r}
+
+ESG_data_B |>
+  summary()
+
+```
+
+
+# Descriptive statistics table
+```{r}
+
+library(modelsummary)
+library(rstudioapi)
+
+ESG_data_B |>
+  select(q, ESGscore, Firm_Size, Leverage) |>
+  datasummary(
+    output = "default",   # or "html", "latex", "markdown", knitr::kable(), etc.
+    formula = q + ESGscore + Firm_Size + Leverage ~ 
+              (N = N) + (Mean = Mean) + (Median = Median) + 
+              (SD = SD) + (Min = Min) + (Max = Max)
+  )
+
+```
+
+
+# Correlation table
+```{r}
+
+library(correlation)
+
+ESG_data_B |> 
+  select(q, ESGscore, Firm_Size, Leverage) |>
+  correlation() |> # compute correlation matrix
+  datasummary_correlation(stars = TRUE)   # auto stars + note at bottom
+
+```
+
+
+# Regression analysis: Simple regression
+```{r}
+
+# Model 1: Simple regression
+model1 <- lm(q ~ ESGscore, data = ESG_data_B)
+
+summary(model1)
+
+```
+
+
+# Regression analysis: Pooled Ordinary Least Squares (OLS) without/with Year or/and industry indicators
+```{r}
+
+# Model 2: Multiple regression  
+model2 <- lm(q ~ ESGscore + Firm_Size + Leverage, data = ESG_data_B)   
+
+# Model 3: with industry fixed effects
+model3 <- lm(q ~ ESGscore + Firm_Size + Leverage + factor(Industry), data = ESG_data_B)
+
+# Model 4: industry + year fixed effects
+model4 <- lm(q ~ ESGscore + Firm_Size + Leverage + factor(Industry) + factor(Year), data = ESG_data_B)
+
+```
+
+
+# Professional regression tables with side-by-side models
+```{r}
+
+library(stargazer)
+
+suppressWarnings(  # suppress harmless warnings  
+  
+stargazer(
+  model1, model2, model3, model4,
+  
+  type = "text",           # use "latex", "html", "markdown" depending on where you want to paste it
+  # type = "html"   → good for R Markdown / Word
+  
+  title             = "MAIN RESULTS",
+  dep.var.labels    = "q",               # or "Tobin's q", "Firm performance", etc.
+  column.labels     = c("Model 1", "Model 2", "Model 3", "Model 4"),
+  covariate.labels  = c("ESGscore", "Firm Size", "Leverage"),    
+  
+  # Keep only the variables you want to show (omit industry/year dummies)
+  keep              = c("ESGscore", "Firm_Size", "Leverage"),
+  
+  # Professional style choices
+  se                = list(NULL, NULL, NULL, NULL),   # default = show standard errors in ()
+  star.cutoffs      = c(0.1, 0.05, 0.01),
+  notes             = "Standard errors in parentheses; ***p<0.01, **p<0.05, *p<0.1",
+  notes.append      = FALSE,
+  
+  # Custom rows for fixed effects
+  add.lines = list(
+    c("Industry Indicators", "No", "No", "Yes", "Yes"),
+    c("Year Indicators",     "No", "No", "No",  "Yes")
+  ),
+  
+  # Bottom statistics
+  keep.stat         = c("n", "rsq"),          # show only N and R²
+  digits            = 3,
+  
+  # Cosmetic / layout
+  no.space          = TRUE,          # remove empty lines → more compact
+  align             = TRUE,          # align numbers at decimal point
+  font.size         = "small",       # or "footnotesize", "scriptsize", etc.
+  single.row        = FALSE          # coefficients and se on separate rows (your style)
+  )
+
+)
+
+```
+
+
+# Sensitivity analysis: Alternative regression specifications or subsamples
+```{r}
+
+# Main / baseline (full sample, ESG measure + controls + fixed effects)
+m_main <- model4
+
+# Alternative ESG measure (e.g. from Provider A, instead of Provider B)
+m_alt <- lm(q ~ ESGscore + Firm_Size + Leverage + factor(Industry) + factor(Year), 
+             data = ESG_data_A)
+
+# Subsample: large firms (e.g. Firm_Size above median)
+m_large <- lm(q ~ ESGscore + Firm_Size + Leverage + factor(Industry) + factor(Year), 
+              data = (ESG_data_B |> filter(Firm_Size > median(Firm_Size)))
+              )  
+
+# Subsample: 2010–2019
+m_1019 <- lm(q ~ ESGscore + Firm_Size + Leverage + factor(Industry) + factor(Year), 
+             data = (ESG_data_B |> filter(Year >= 2010 & Year <= 2019))
+              )  
+
+```
+
+
+# Professional regression tables for robustness checks
+```{r}
+
+suppressWarnings(  # suppress harmless warnings  
+  
+stargazer(
+  m_main, m_alt, m_large, m_1019,
+  
+  type              = "text",     # change to "html" for paper/Rmd/Word
+  
+  title             = "ROBUSTNESS ANALYSIS",
+  dep.var.labels    = "q",  
+  
+  column.labels     = c("Main Results", 
+                        "Alt. ESG Score", 
+                        "Large Firms", 
+                        "2010-2019"),
+  
+
+  # Only show ESGscore for brevity
+  keep              = "^ESGscore",   
+  
+  # Rename coefficient(s) nicely
+  covariate.labels  = "ESGscore",
+  
+  # Standard errors in parentheses, stars
+  se                = NULL,                    # default = show in ()
+  star.cutoffs      = c(0.1, 0.05, 0.01),
+  notes             = "Standard errors in parentheses; ***p<0.01, **p<0.05, *p<0.1",
+  notes.append      = FALSE,
+  
+  # Custom rows at the bottom
+  add.lines = list(
+    c("Controls",                  "Yes", "Yes", "Yes", "Yes"),
+    c("Industry Indicators",       "Yes", "Yes", "Yes", "Yes"),
+    c("Year Indicators",           "Yes", "Yes", "Yes", "Yes")
+  ),
+  
+  # Only show N and R² at the bottom
+  keep.stat         = c("n", "rsq"),
+  digits            = 3,
+  
+  # Layout improvements 
+  no.space          = TRUE,
+  align             = TRUE,
+  single.row        = FALSE,          # coef + se on separate rows
+  font.size         = "small"         # 
+  )
+
+)
+
+```
+
+
