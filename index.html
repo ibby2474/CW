@@ -1116,7 +1116,7 @@ function bootApp() {
   document.getElementById('g-cal').value   = goals.calories;
   document.getElementById('g-prot').value  = goals.protein;
   document.getElementById('g-water').value = goals.water;
-  const apiKey = DB.get(PK('apikey')) || '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';
+  const apiKey = DB.get(PK('apikey')) || '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';
   if (!DB.get(PK('apikey'))) DB.set(PK('apikey'), apiKey);
   document.getElementById('g-apikey').value = apiKey;
   const times = DB.get(PK('reminderTimes')) || {};
@@ -1426,7 +1426,7 @@ async function handleLabelFile(e) {
 }
 
 async function analyseLabel(dataUrl) {
-  const apiKey = DB.get(PK('apikey')) || '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';
+  const apiKey = DB.get(PK('apikey')) || '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';
   if (!DB.get(PK('apikey'))) DB.set(PK('apikey'), apiKey);
   if (!apiKey) {
     document.getElementById('log-err').style.display = 'block';
@@ -1474,7 +1474,7 @@ async function analyseLabel(dataUrl) {
 }
 
 async function analyseImage(dataUrl) {
-  const apiKey = DB.get(PK('apikey')) || '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';
+  const apiKey = DB.get(PK('apikey')) || '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';
   if (!DB.get(PK('apikey'))) DB.set(PK('apikey'), apiKey);
   if (!apiKey) {
     document.getElementById('log-err').style.display = 'block';
@@ -1667,7 +1667,7 @@ async function recalcMacros() {
 
   if (!items.length) { showToast('Add at least one ingredient with a weight'); return; }
 
-  const apiKey = DB.get(PK('apikey')) || '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';
+  const apiKey = DB.get(PK('apikey')) || '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';
   if (!DB.get(PK('apikey'))) DB.set(PK('apikey'), apiKey);
   if (!apiKey) { showToast('⚠️ API key needed for recalculation'); return; }
 
