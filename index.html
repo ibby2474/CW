@@ -1116,7 +1116,7 @@ function bootApp() {
   document.getElementById('g-cal').value   = goals.calories;
   document.getElementById('g-prot').value  = goals.protein;
   document.getElementById('g-water').value = goals.water;
-  const apiKey = DB.get(PK('apikey')) || 'YOUR_GEMINI_API_KEY_HERE';
+  const apiKey = DB.get(PK('apikey')) || 'AIzaSyAtNiRg9RmjxPbvgFSirUl1Qm7TcP-l1hg';
   if (!DB.get(PK('apikey'))) DB.set(PK('apikey'), apiKey);
   document.getElementById('g-apikey').value = apiKey;
   const times = DB.get(PK('reminderTimes')) || {};
