@@ -499,7 +499,7 @@ def _(
     - Motivated BSc Accounting & Finance student at Bayes Business School (Predicted: **1st Class**).
     - Independent investment book yielding **90%+ net profit**.
     - Shadowed a Partner at a boutique hedge fund overseeing **£500M+ in fixed-income assets**.
-    - Independently designed and deployed **NutriScan AI** — a live Firebase/Gemini PWA,
+    - Independently designed and deployed **NutriScan AI** — a live Firebase/Groq PWA,
       currently in initial beta testing. Applies LLM API skills from Week 09 of AF1204.
     - Actively contributing to a Fintech startup (FX solutions) — assisting with
       funding, design, and testing.
@@ -522,7 +522,7 @@ def _(
     | Programming | Python · Jupyter Notebook · Marimo |
     | Data & Visualisation | Pandas · NumPy · Plotly · Altair · SciPy |
     | Statistical Methods | OLS Regression · Monte Carlo · Time Series · Hypothesis Testing |
-    | Web & AI | Playwright · spaCy NLP · Gemini 1.5 Flash · Firebase · LLM APIs |
+    | Web & AI | Playwright · spaCy NLP · Groq API Key · Firebase · LLM APIs |
     | Finance Tools | yfinance · PyMuPDF · EViews · Bloomberg Terminal |
 
     ---
@@ -641,9 +641,9 @@ def _(
         ### 🤖 Week 09: LLM API — Applied to NutriScan AI
 
         Week 09 skills applied directly in **NutriScan AI**:
-        - Structured multi-modal prompts sent to **Gemini 1.5 Flash** via OpenRouter
+        - Structured multi-modal prompts sent to **Groq API ** via OpenRouter
         - JSON nutrition estimates parsed from image, label, and natural-language inputs
-        - Weekly personalised insight paragraphs generated via the LLM API
+        - Weekly personalised insight paragraphs generated via the Groq API
         """),
     ])
 
@@ -656,7 +656,7 @@ def _(
         ### 📱 NutriScan AI — Live App *(Initial Beta Testing)*
 
         An independently built **Progressive Web App (PWA)** using
-        **Gemini 1.5 Flash** AI to scan meals from photos, labels, and barcodes.
+        **Groq API** to scan meals from photos, labels, and barcodes.
         Applies **LLM API skills from Week 09** in a real production environment.
 
         **Live:** [food-app-cb863.web.app](https://food-app-cb863.web.app/)
@@ -723,4 +723,3 @@ def _(
 
 if __name__ == "__main__":
     app.run()
-    
