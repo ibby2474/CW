@@ -601,7 +601,7 @@ def _(
     - Motivated BSc Accounting & Finance student at Bayes Business School (Predicted: **1st Class**).
     - Independent investment book yielding **90%+ net profit**.
     - Shadowed a Partner at a boutique hedge fund overseeing **£500M+ in fixed-income assets**.
-    - Independently designed and deployed **NutriScan AI** — a live Firebase/Gemini PWA,
+    - Independently designed and deployed **NutriScan AI** — a live Firebase/Groq PWA,
       currently in initial beta testing. Applies LLM API skills from Week 09 of AF1204.
     - Actively contributing to a Fintech startup (FX solutions) — assisting with
       funding, design, and testing.
@@ -624,7 +624,7 @@ def _(
     | Programming | Python · Jupyter Notebook · Marimo |
     | Data & Visualisation | Pandas · NumPy · Plotly · Altair · SciPy |
     | Statistical Methods | OLS Regression · Monte Carlo · DCF Modelling · Hypothesis Testing |
-    | Web & AI | Playwright · spaCy NLP · Gemini 1.5 Flash · Firebase · LLM APIs |
+    | Web & AI | Playwright · spaCy NLP · Groq 1.5 Flash · Firebase · LLM APIs |
     | Finance Tools | yfinance · PyMuPDF · EViews · Bloomberg Terminal |
 
     ---
@@ -714,7 +714,7 @@ def _(
         | 04 | Data Prep & Portfolio | `groupby().shift()`, `apply/lambda`, `pd.crosstab`, OLS, `mo.ui.tabs` |
         | 06–07 | Web Scraping + OCR | Playwright `async/await`, shadow DOM evasion, PyMuPDF, Tesseract OCR |
         | 08 | Statistical Analysis | OLS regression, R², p-value interpretation, `scipy.stats` |
-        | 09 | LLM API | Gemini 1.5 Flash, multi-modal prompting, JSON response parsing |
+        | 09 | LLM API | Groq API Key, multi-modal prompting, JSON response parsing |
         | 10 | NLP & Word Clouds | spaCy transformer, bigrams, lemmatisation, `Counter`, word clouds |
         """),
 
@@ -744,7 +744,7 @@ def _(
 
         ### 🤖 Week 09: LLM API — Applied via NutriScan AI
 
-        - Structured multi-modal prompts sent to **Gemini 1.5 Flash** via OpenRouter
+        - Structured multi-modal prompts sent to **Groq API Key** via OpenRouter
         - JSON nutrition estimates parsed from image, label, and natural-language inputs
         - Weekly personalised AI insight paragraphs generated for each user
         """),
@@ -757,7 +757,7 @@ def _(
 
         ### 📱 NutriScan AI — Live App *(Initial Beta Testing)*
 
-        An independently built **Progressive Web App (PWA)** using **Gemini 1.5 Flash** AI
+        An independently built **Progressive Web App (PWA)** using **Groq ** AI
         to scan meals from photos, labels, and barcodes — estimating calories and protein.
 
         **Live:** [food-app-cb863.web.app](https://food-app-cb863.web.app/)
@@ -770,10 +770,10 @@ def _(
         | ✍️ Natural language | "Bowl of pasta with chicken" — AI estimates macros |
         | 🔥 Streak & Badges | 7-day tracker, 8 achievement badges |
         | 📈 Progress charts | 14-day weight & body fat line charts |
-        | 🤖 Weekly AI insight | Personalised Gemini paragraph about your week |
+        | 🤖 Weekly AI insight | Personalised Groq paragraph about your week |
         | ☁️ Cloud sync | Firebase Firestore for multi-device data |
 
-        **Stack:** Firebase Hosting · Firestore · Gemini 1.5 Flash · OpenRouter · Vanilla JS
+        **Stack:** Firebase Hosting · Firestore · Groq 1.5 Flash · OpenRouter · Vanilla JS
 
         ---
 
