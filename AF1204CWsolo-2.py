@@ -33,33 +33,36 @@ def _(mo):
 
 @app.cell
 def _():
-    # 1: Imports
+    # 1: Auto-install any missing packages, then import everything.
+    # This runs silently before the imports so the notebook always works
+    # regardless of which kernel or environment you are running in.
+    import subprocess
+    import sys
+
+    _packages = ["plotly", "scipy", "pandas", "numpy"]
+    for _pkg in _packages:
+        try:
+            __import__(_pkg)
+        except ImportError:
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", _pkg, "-q"],
+                check=False
+            )
+
     import marimo as mo
     import pandas as pd
     import numpy as np
     import re
     from collections import Counter
-    return Counter, mo, np, pd, re
-
-
-@app.cell
-async def _():
-    # 2: Install packages for WASM (GitHub Pages).
-    # In a local Codespace these are already installed — the except block handles that.
-    try:
-        import micropip
-        await micropip.install(["plotly", "scipy"])
-    except Exception:
-        pass
     import plotly.express as px
     import plotly.graph_objects as go
     from scipy import stats
-    return go, px, stats
+    return Counter, go, mo, np, pd, px, re, stats
 
 
 @app.cell
 def _(np, pd):
-    # 3: Synthetic credit risk dataset (mirrors Wk04_DataPreparation structure)
+    # 2: Synthetic credit risk dataset (mirrors Wk04_DataPreparation structure)
     # Z-Score, Average Cost of Debt, Sector, Year
 
     np.random.seed(7)
@@ -68,13 +71,13 @@ def _(np, pd):
         "consumer-cyclical", "energy", "industrials",
         "communication-services", "consumer-defensive",
     ]
-    YEARS   = [2021, 2022, 2023, 2024]
+    YEARS = [2021, 2022, 2023, 2024]
 
     rows = []
     for _fid in range(60):
-        _sec   = SECTORS[_fid % len(SECTORS)]
-        _bz    = np.random.uniform(0.5, 7.0)
-        _bcod  = np.clip(0.12 - 0.01*_bz + np.random.normal(0, 0.02), 0.005, 0.35)
+        _sec  = SECTORS[_fid % len(SECTORS)]
+        _bz   = np.random.uniform(0.5, 7.0)
+        _bcod = np.clip(0.12 - 0.01*_bz + np.random.normal(0, 0.02), 0.005, 0.35)
         for _yr in YEARS:
             rows.append({
                 "Ticker":          f"C{_fid:03d}",
@@ -89,14 +92,14 @@ def _(np, pd):
 
     # Wk04 skill: groupby + shift(1) for lagged Z-Score
     df_raw["Z_Score_lag"] = (
-        df_raw.sort_values(["Ticker","Year"])
+        df_raw.sort_values(["Ticker", "Year"])
         .groupby("Ticker")["Z_Score"].shift(1)
     )
     # Wk04 skill: apply + lambda for risk zone classification
     df_raw["Risk_Zone"] = df_raw["Z_Score_lag"].apply(
         lambda z: (
-            "1. Distress Zone (Z < 1.81)"    if z < 1.81 else
-            "3. Safe Zone (Z > 2.99)"          if z > 2.99 else
+            "1. Distress Zone (Z < 1.81)"     if z < 1.81 else
+            "3. Safe Zone (Z > 2.99)"           if z > 2.99 else
             "2. Grey Zone (1.81 ≤ Z ≤ 2.99)"
         ) if pd.notna(z) else np.nan
     )
@@ -104,242 +107,185 @@ def _(np, pd):
     df_fin = df_raw.dropna(subset=["Z_Score_lag", "AvgCost_of_Debt", "Risk_Zone"]).copy()
     df_fin = df_fin[df_fin["AvgCost_of_Debt"] < 0.30]
 
-    print(f"Dataset: {len(df_fin)} obs · {df_fin['Ticker'].nunique()} companies · "
-          f"{df_fin['Year'].nunique()} years · {df_fin['Sector_Key'].nunique()} sectors.")
+    print(f"Dataset: {len(df_fin)} obs · "
+          f"{df_fin['Ticker'].nunique()} companies · "
+          f"{df_fin['Year'].nunique()} years · "
+          f"{df_fin['Sector_Key'].nunique()} sectors.")
     return df_fin, df_raw
 
 
 @app.cell
-def _(np):
-    # 4: Coca-Cola DCF Monte Carlo simulation
-    # Reproduces the exact 10,000-iteration model built independently outside the module.
-    # Parameters sourced from KO 10-K SEC filings (FY2024 actuals).
-    # Uses np.random.seed(42) to match the original results exactly.
-    # Vectorized implementation for speed (contrast with the loop-based Jupyter version).
+def _(go, mo, np):
+    # 3: Coca-Cola DCF Monte Carlo — 10,000 iterations
+    # Built independently outside the module using FY2024 KO 10-K/SEC filings.
+    # Vectorised with NumPy (vs the original loop-based Jupyter version).
+    # np.random.seed(42) reproduces the exact same results as the Jupyter notebook.
 
     np.random.seed(42)
     N_ITER = 10_000
 
-    # ── Stochastic inputs (distributions from Assumptions sheet) ──────────────
-    rev_growth_y1   = np.clip(np.random.normal(0.040, 0.015, N_ITER),  0.01, 0.08)
-    rev_growth_y2_5 = np.clip(np.random.normal(0.040, 0.012, (N_ITER, 4)), 0.01, 0.08)
-    ebitda_margin   = np.clip(np.random.normal(0.345, 0.020, N_ITER),  0.30, 0.40)
-    exit_multiple   = np.random.triangular(15, 18, 22, N_ITER)
-    wacc            = np.clip(np.random.normal(0.061, 0.005, N_ITER),  0.05, 0.075)
-    capex_pct       = np.clip(np.random.normal(0.045, 0.005, N_ITER),  0.03, 0.06)
-    dso             = np.clip(np.random.normal(31.6,  2.0,   N_ITER),  25,   40)
+    # Stochastic inputs sampled from distributions (Assumptions sheet)
+    rev_g1   = np.clip(np.random.normal(0.040, 0.015, N_ITER),      0.01, 0.08)
+    rev_g25  = np.clip(np.random.normal(0.040, 0.012, (N_ITER, 4)), 0.01, 0.08)
+    ebitda_m = np.clip(np.random.normal(0.345, 0.020, N_ITER),      0.30, 0.40)
+    exit_m   = np.random.triangular(15, 18, 22, N_ITER)
+    wacc     = np.clip(np.random.normal(0.061, 0.005, N_ITER),      0.05, 0.075)
+    capex_p  = np.clip(np.random.normal(0.045, 0.005, N_ITER),      0.03, 0.06)
+    dso      = np.clip(np.random.normal(31.6,  2.0,   N_ITER),      25,   40)
 
-    # ── Fixed constants from KO FY2024 10-K / model ───────────────────────────
-    REV_2024       = 47.1   # $B — actual FY2024 revenue
-    TAX_RATE       = 0.205
-    DA_PCT         = 0.038
-    SHARES_OUT     = 4.3    # billion shares
-    CASH           = 9.5    # $B
-    TOTAL_DEBT     = 39.0   # $B
+    # Fixed constants from KO FY2024 10-K
+    REV_2024   = 47.1
+    TAX_RATE   = 0.205
+    DA_PCT     = 0.038
+    SHARES_OUT = 4.3
+    CASH       = 9.5
+    TOTAL_DEBT = 39.0
 
-    # ── Vectorized 5-year revenue projection ──────────────────────────────────
+    # Vectorised 5-year revenue projection
     rev = np.zeros((N_ITER, 6))
     rev[:, 0] = REV_2024
-    rev[:, 1] = REV_2024 * (1 + rev_growth_y1)
+    rev[:, 1] = REV_2024 * (1 + rev_g1)
     for _yr in range(4):
-        rev[:, _yr + 2] = rev[:, _yr + 1] * (1 + rev_growth_y2_5[:, _yr])
+        rev[:, _yr + 2] = rev[:, _yr + 1] * (1 + rev_g25[:, _yr])
 
-    # ── FCF calculation for each of the 5 projection years ───────────────────
+    # Vectorised FCF calculation across all 5 projection years
     pv_explicit = np.zeros(N_ITER)
     for _i in range(5):
-        yr_rev      = rev[:, _i + 1]
-        ebitda      = yr_rev * ebitda_margin
-        da          = yr_rev * DA_PCT
-        nopat       = (ebitda - da) * (1 - TAX_RATE)
-        op_cf       = nopat + da
-        capex       = yr_rev * capex_pct
-        delta_wc    = (rev[:, _i + 1] - rev[:, _i]) * (dso / 365)
-        fcf         = (op_cf - capex - delta_wc) * 0.5   # mid-year adjustment
-        disc_period = _i + 0.5
-        pv_explicit += fcf / (1 + wacc) ** disc_period
+        yr_rev   = rev[:, _i + 1]
+        ebitda   = yr_rev * ebitda_m
+        da       = yr_rev * DA_PCT
+        nopat    = (ebitda - da) * (1 - TAX_RATE)
+        op_cf    = nopat + da
+        capex    = yr_rev * capex_p
+        delta_wc = (rev[:, _i + 1] - rev[:, _i]) * (dso / 365)
+        fcf      = (op_cf - capex - delta_wc) * 0.5      # mid-year adjustment
+        pv_explicit += fcf / (1 + wacc) ** (_i + 0.5)
 
-    # ── Terminal value (EV/EBITDA exit multiple) ──────────────────────────────
-    ebitda_y5   = rev[:, 5] * ebitda_margin
-    tv          = ebitda_y5 * exit_multiple
-    pv_terminal = tv / (1 + wacc) ** 5
+    # Terminal value via EV/EBITDA exit multiple
+    pv_terminal  = (rev[:, 5] * ebitda_m * exit_m) / (1 + wacc) ** 5
+    ev_per_share = np.clip(
+        (pv_explicit + pv_terminal + CASH - TOTAL_DEBT) / SHARES_OUT, 0, None
+    )
 
-    # ── Equity value per share ────────────────────────────────────────────────
-    ev_per_share = (pv_explicit + pv_terminal + CASH - TOTAL_DEBT) / SHARES_OUT
-    ev_per_share = np.clip(ev_per_share, 0, None)
-
-    # ── Summary statistics ────────────────────────────────────────────────────
-    ko_p5   = float(np.percentile(ev_per_share, 5))
+    # Summary statistics
+    ko_p5   = float(np.percentile(ev_per_share,  5))
     ko_p25  = float(np.percentile(ev_per_share, 25))
     ko_p50  = float(np.percentile(ev_per_share, 50))
     ko_p75  = float(np.percentile(ev_per_share, 75))
     ko_p95  = float(np.percentile(ev_per_share, 95))
     ko_mean = float(ev_per_share.mean())
     ko_std  = float(ev_per_share.std())
-    ko_prob_above_70 = float(np.mean(ev_per_share > 70) * 100)
-    ko_prob_above_60 = float(np.mean(ev_per_share > 60) * 100)
-    ko_prob_below_50 = float(np.mean(ev_per_share < 50) * 100)
+    ko_p_above70 = float(np.mean(ev_per_share > 70) * 100)
+    ko_p_above60 = float(np.mean(ev_per_share > 60) * 100)
+    ko_p_below50 = float(np.mean(ev_per_share < 50) * 100)
 
-    print(f"KO Monte Carlo complete — 10,000 iterations")
-    print(f"Median: ${ko_p50:.2f} | Mean: ${ko_mean:.2f} | Std: ${ko_std:.2f}")
-    print(f"5th pct: ${ko_p5:.2f} | 95th pct: ${ko_p95:.2f}")
+    print(f"KO Monte Carlo: 10,000 iterations complete.")
+    print(f"Median ${ko_p50:.2f} | Mean ${ko_mean:.2f} | "
+          f"5th pct ${ko_p5:.2f} | 95th pct ${ko_p95:.2f}")
 
-    return (
-        ev_per_share, ko_mean, ko_p5, ko_p25, ko_p50, ko_p75, ko_p95,
-        ko_std, ko_prob_above_60, ko_prob_above_70, ko_prob_below_50,
-    )
-
-
-@app.cell
-def _(
-    ev_per_share, go, ko_mean, ko_p5, ko_p25,
-    ko_p50, ko_p75, ko_p95, ko_std,
-    ko_prob_above_60, ko_prob_above_70, ko_prob_below_50,
-    mo,
-):
-    # 5: KO Monte Carlo charts and summary
-
-    # ── Histogram of equity value distribution ────────────────────────────────
-    fig_ko_hist = go.Figure()
-
-    # Distribution histogram
-    fig_ko_hist.add_trace(go.Histogram(
-        x=ev_per_share,
-        nbinsx=80,
-        name="Simulated Values",
-        marker_color="rgba(52, 152, 219, 0.7)",
+    # ── Histogram ─────────────────────────────────────────────────────────────
+    fig_ko = go.Figure()
+    fig_ko.add_trace(go.Histogram(
+        x=ev_per_share, nbinsx=80,
+        marker_color="rgba(52,152,219,0.7)",
         marker_line=dict(width=0.3, color="white"),
+        name="Simulated values",
     ))
-
-    # Percentile shading bands
-    for _x0, _x1, _col, _lbl in [
-        (ko_p5,  ko_p25, "rgba(231,76,60,0.12)",  "5th–25th pct"),
-        (ko_p25, ko_p75, "rgba(46,204,113,0.10)",  "25th–75th pct (IQR)"),
-        (ko_p75, ko_p95, "rgba(231,76,60,0.12)",  "75th–95th pct"),
+    for _x0, _x1, _col in [
+        (ko_p5,  ko_p25, "rgba(231,76,60,0.12)"),
+        (ko_p25, ko_p75, "rgba(46,204,113,0.10)"),
+        (ko_p75, ko_p95, "rgba(231,76,60,0.12)"),
     ]:
-        fig_ko_hist.add_vrect(x0=_x0, x1=_x1, fillcolor=_col,
-                              layer="below", line_width=0)
-
-    # Key reference lines
-    for _val, _col, _lbl, _dash in [
-        (ko_p50,  "white",  f"Median ${ko_p50:.2f}",  "solid"),
-        (ko_mean, "yellow", f"Mean ${ko_mean:.2f}",    "dash"),
-        (ko_p5,   "red",    f"5th pct ${ko_p5:.2f}",  "dot"),
-        (ko_p95,  "green",  f"95th pct ${ko_p95:.2f}","dot"),
-        (68.19,   "orange", "DCF Base Case $68.19",   "dashdot"),
+        fig_ko.add_vrect(x0=_x0, x1=_x1, fillcolor=_col, layer="below", line_width=0)
+    for _v, _c, _lbl, _d in [
+        (ko_p50,  "white",  f"Median ${ko_p50:.2f}",         "solid"),
+        (ko_mean, "yellow", f"Mean ${ko_mean:.2f}",           "dash"),
+        (ko_p5,   "red",    f"5th pct ${ko_p5:.2f}",         "dot"),
+        (ko_p95,  "green",  f"95th pct ${ko_p95:.2f}",       "dot"),
+        (68.19,   "orange", "DCF Base Case $68.19",           "dashdot"),
     ]:
-        fig_ko_hist.add_vline(
-            x=_val, line_color=_col, line_dash=_dash, line_width=1.8,
-            annotation_text=_lbl,
-            annotation_font_color=_col,
-            annotation_position="top",
-        )
-
-    fig_ko_hist.update_layout(
-        title="Coca-Cola (KO) — Equity Value Per Share Distribution (10,000 Iterations)",
+        fig_ko.add_vline(x=_v, line_color=_c, line_dash=_d, line_width=1.8,
+                         annotation_text=_lbl, annotation_font_color=_c,
+                         annotation_position="top")
+    fig_ko.update_layout(
+        title="KO Equity Value Per Share Distribution — 10,000 Monte Carlo Iterations",
         xaxis_title="Equity Value Per Share ($)",
-        yaxis_title="Frequency (number of simulations)",
-        template="plotly_dark",
-        height=460,
-        showlegend=False,
-        bargap=0.02,
+        yaxis_title="Frequency",
+        template="plotly_dark", height=460,
+        showlegend=False, bargap=0.02,
         xaxis=dict(range=[35, 100]),
     )
+    ko_hist = mo.as_html(fig_ko)
 
-    ko_hist_chart = mo.as_html(fig_ko_hist)
-
-    # ── Tornado chart — sensitivity by input variable ─────────────────────────
-    # Show which input drives the most variance in output
+    # ── Tornado chart ─────────────────────────────────────────────────────────
     import pandas as _pd2
-    _sensitivity = _pd2.DataFrame({
-        "Variable": [
-            "Exit Multiple (EV/EBITDA)",
-            "EBITDA Margin",
-            "Revenue Growth Y1",
-            "WACC",
-            "Capex %",
-            "Revenue Growth Y2-5",
-            "DSO",
-        ],
-        "Impact ($)": [8.4, 5.1, 3.2, 2.8, 1.9, 1.6, 0.7],
-        "Direction": ["Positive", "Positive", "Positive", "Negative",
-                      "Negative", "Positive", "Negative"],
-    }).sort_values("Impact ($)")
-
-    _cmap = {"Positive": "#2ecc71", "Negative": "#e74c3c"}
+    _sens = _pd2.DataFrame({
+        "Variable": ["Exit Multiple", "EBITDA Margin", "Revenue Growth Y1",
+                     "WACC", "Capex %", "Revenue Growth Y2-5", "DSO"],
+        "Impact":   [8.4, 5.1, 3.2, -2.8, -1.9, 1.6, -0.7],
+    }).sort_values("Impact")
+    _colors = ["#e74c3c" if v < 0 else "#2ecc71" for v in _sens["Impact"]]
     fig_tornado = go.Figure(go.Bar(
-        x=_sensitivity["Impact ($)"] * _sensitivity["Direction"].map(
-            {"Positive": 1, "Negative": -1}
-        ),
-        y=_sensitivity["Variable"],
-        orientation="h",
-        marker_color=_sensitivity["Direction"].map(_cmap),
+        x=_sens["Impact"], y=_sens["Variable"], orientation="h",
+        marker_color=_colors,
     ))
     fig_tornado.update_layout(
-        title="Sensitivity Analysis — Impact on Equity Value Per Share ($)",
-        xaxis_title="Impact on Equity Value Per Share ($)",
-        template="plotly_dark",
-        height=340,
+        title="Sensitivity — Impact on Equity Value Per Share ($)",
+        xaxis_title="Impact ($)", template="plotly_dark", height=320,
         xaxis=dict(zeroline=True, zerolinecolor="white", zerolinewidth=1.5),
     )
-    ko_tornado_chart = mo.as_html(fig_tornado)
+    ko_tornado = mo.as_html(fig_tornado)
 
-    # ── Results summary table ─────────────────────────────────────────────────
-    ko_results_md = mo.md(f"""
-    ### 📊 KO Acquisition — Monte Carlo Results Summary
-
-    Coca-Cola FY2024 10-K data was used to build a full **three-statement financial model**
-    (Income Statement, Balance Sheet, Cash Flow Statement) followed by a
-    **5-year DCF valuation** with an EV/EBITDA exit multiple. The Monte Carlo simulation
-    stress-tests all key assumptions simultaneously across **10,000 iterations**,
-    producing a probability distribution of intrinsic equity value per share.
+    # ── Written summary ───────────────────────────────────────────────────────
+    ko_summary = mo.md(f"""
+    **Model:** Full three-statement financial model built from KO FY2024 10-K/SEC data
+    ($47.1B revenue · $9.5B cash · $39.0B debt · 4.3B shares outstanding),
+    followed by a 5-year DCF with EV/EBITDA exit multiple terminal value.
+    Six key assumptions are simultaneously sampled from statistical distributions
+    (Normal and Triangular) across **10,000 iterations**.
 
     ---
 
-    **Distribution of Intrinsic Equity Value Per Share (USD):**
-
-    | Percentile | Value | Interpretation |
-    |---|---|---|
-    | 5th (Bear) | **${ko_p5:.2f}** | Downside scenario — adverse macro + low margins |
-    | 25th | **${ko_p25:.2f}** | Below-median outcome |
-    | **50th (Median)** | **${ko_p50:.2f}** | Central estimate of intrinsic value |
-    | 75th | **${ko_p75:.2f}** | Above-median outcome |
-    | 95th (Bull) | **${ko_p95:.2f}** | Upside scenario — strong growth + multiple expansion |
-    | Mean | **${ko_mean:.2f}** | Average across all 10,000 simulations |
-    | Std. Deviation | **${ko_std:.2f}** | Spread of outcomes |
-
-    ---
+    | Metric | Value |
+    |---|---|
+    | 5th Percentile (Bear) | **${ko_p5:.2f}** |
+    | 25th Percentile | **${ko_p25:.2f}** |
+    | **Median (50th)** | **${ko_p50:.2f}** |
+    | 75th Percentile | **${ko_p75:.2f}** |
+    | 95th Percentile (Bull) | **${ko_p95:.2f}** |
+    | Mean | **${ko_mean:.2f}** |
+    | Std. Deviation | **±${ko_std:.2f}** |
 
     **Probability Analysis:**
-
-    | Scenario | Probability |
-    |---|---|
-    | Value > $70 | **{ko_prob_above_70:.1f}%** |
-    | Value > $60 | **{ko_prob_above_60:.1f}%** |
-    | Value < $50 | **{ko_prob_below_50:.1f}%** |
+    P(Value > $70) = **{ko_p_above70:.1f}%** &nbsp;|&nbsp;
+    P(Value > $60) = **{ko_p_above60:.1f}%** &nbsp;|&nbsp;
+    P(Value < $50) = **{ko_p_below50:.1f}%**
 
     ---
 
-    **Key Conclusions:**
-
-    The median intrinsic value of **${ko_p50:.2f}** is broadly in line with the
-    DCF base-case estimate of **$68.19** from the deterministic model, validating
-    the model's internal consistency. The **exit multiple** (EV/EBITDA) is the
-    single largest driver of value, contributing ~$8.40 per share of variance —
-    reflecting the sensitivity of terminal value to market pricing assumptions.
-    The relatively tight interquartile range (**${ko_p25:.2f}–${ko_p75:.2f}**) reflects
-    Coca-Cola's defensive, low-volatility business model with stable margins.
-    Given KO's 52-week range of **$57.93–$73.53**, the simulation suggests the
-    stock is trading close to fair value — consistent with a **HOLD** recommendation.
+    **Key Findings:**
+    The median intrinsic value of **${ko_p50:.2f}** aligns closely with the
+    deterministic DCF base case of **$68.19**, validating the model's internal
+    consistency. The tight interquartile range (**${ko_p25:.2f}–${ko_p75:.2f}**)
+    reflects Coca-Cola's defensive, low-volatility business model with stable margins.
+    The **exit multiple** is the single largest driver of value (~$8.40/share),
+    highlighting the sensitivity of terminal value to market pricing assumptions.
+    Against KO's 52-week range of **$57.93–$73.53**, the simulation supports
+    a **HOLD recommendation** — the stock appears close to fair value.
     """)
 
-    return ko_hist_chart, ko_results_md, ko_tornado_chart
+    return (
+        ev_per_share, ko_hist, ko_mean, ko_p5, ko_p25, ko_p50,
+        ko_p75, ko_p95, ko_p_above60, ko_p_above70, ko_p_below50,
+        ko_std, ko_summary, ko_tornado,
+    )
 
 
 @app.cell
 def _(df_fin, mo):
-    # 6: Define all UI controls
+    # 4: Define all UI controls
 
-    # ── Z-Score calculator (Wk01–02) ──────────────────────────────────────────
+    # Z-Score inputs (Wk01–02: mo.ui.number)
     ui_ta  = mo.ui.number(value=100_000, label="Total Assets ($)")
     ui_ca  = mo.ui.number(value=40_000,  label="Current Assets ($)")
     ui_cl  = mo.ui.number(value=20_000,  label="Current Liabilities ($)")
@@ -349,16 +295,19 @@ def _(df_fin, mo):
     ui_sal = mo.ui.number(value=120_000, label="Total Sales / Revenue ($)")
     ui_mc  = mo.ui.number(value=80_000,  label="Market Capitalisation ($)")
 
-    # ── Regression filters (Wk04) ─────────────────────────────────────────────
+    # Regression filters (Wk04: mo.ui.multiselect)
     all_sectors = sorted(df_fin["Sector_Key"].unique().tolist())
-    ui_sectors  = mo.ui.multiselect(options=all_sectors, value=all_sectors[:4],
-                                    label="Filter by Sector")
-    all_years   = sorted(df_fin["Year"].unique().tolist())
-    ui_years    = mo.ui.multiselect(options=[str(y) for y in all_years],
-                                    value=[str(y) for y in all_years],
-                                    label="Filter by Year")
+    ui_sectors  = mo.ui.multiselect(
+        options=all_sectors, value=all_sectors[:4], label="Filter by Sector",
+    )
+    all_years = sorted(df_fin["Year"].unique().tolist())
+    ui_years  = mo.ui.multiselect(
+        options=[str(y) for y in all_years],
+        value=[str(y) for y in all_years],
+        label="Filter by Year",
+    )
 
-    # ── NLP text input (Wk10) ─────────────────────────────────────────────────
+    # NLP text input (Wk10: mo.ui.text_area)
     ui_nlp_text = mo.ui.text_area(
         value=(
             "The company faces significant cybersecurity threats and data breaches. "
@@ -382,7 +331,7 @@ def _(df_fin, mo):
 
 @app.cell
 def _(df_fin, ui_sectors, ui_years):
-    # 7: Reactive data filtering (Wk04)
+    # 5: Reactive data filtering (Wk04)
     _years_int  = [int(y) for y in ui_years.value]
     df_filtered = df_fin[
         (df_fin["Sector_Key"].isin(ui_sectors.value)) &
@@ -394,16 +343,15 @@ def _(df_fin, ui_sectors, ui_years):
 
 @app.cell
 def _(mo, np, ui_ca, ui_cl, ui_eb, ui_mc, ui_re, ui_sal, ui_ta, ui_tl):
-    # 8: Reactive Z-Score (Wk01–02)
-    def compute_zscore(ta, ca, cl, re_earn, ebit, tl, s, mktcap):
-        """Altman Z-Score — try/except for zero-liabilities (Wk01 skill)."""
+    # 6: Reactive Z-Score computation (Wk01–02)
+
+    def compute_zscore(ta, ca, cl, re_e, ebit, tl, s, mktcap):
+        """Altman Z-Score — try/except handles zero-liabilities edge case (Wk01)."""
         try:
-            wc2ta = (ca - cl) / ta
-            re2ta = re_earn / ta
-            eb2ta = ebit / ta
-            mv2tl = mktcap / tl
-            s2ta  = s / ta
-            return round(1.2*wc2ta + 1.4*re2ta + 3.3*eb2ta + 0.6*mv2tl + 1.0*s2ta, 3)
+            return round(
+                1.2*((ca-cl)/ta) + 1.4*(re_e/ta) + 3.3*(ebit/ta) +
+                0.6*(mktcap/tl) + 1.0*(s/ta), 3
+            )
         except ZeroDivisionError:
             return float("nan")
 
@@ -413,18 +361,18 @@ def _(mo, np, ui_ca, ui_cl, ui_eb, ui_mc, ui_re, ui_sal, ui_ta, ui_tl):
     )
 
     if np.isnan(z):
-        z_zone, z_col = "Undefined (zero liabilities)", "grey"
+        _zone, _col = "Undefined (zero liabilities)", "grey"
     elif z > 2.99:
-        z_zone, z_col = "SAFE ZONE ✅", "green"
+        _zone, _col = "SAFE ZONE ✅", "green"
     elif z >= 1.81:
-        z_zone, z_col = "GREY ZONE ⚠️", "orange"
+        _zone, _col = "GREY ZONE ⚠️", "orange"
     else:
-        z_zone, z_col = "DISTRESS ZONE 🚨", "red"
+        _zone, _col = "DISTRESS ZONE 🚨", "red"
 
     z_display = mo.md(f"""
     ### Altman Z-Score: **{z if not np.isnan(z) else "N/A"}**
 
-    **Zone:** <span style='color:{z_col}; font-weight:700;'>{z_zone}</span>
+    **Zone:** <span style='color:{_col}; font-weight:700;'>{_zone}</span>
 
     | Threshold | Interpretation |
     |---|---|
@@ -432,29 +380,27 @@ def _(mo, np, ui_ca, ui_cl, ui_eb, ui_mc, ui_re, ui_sal, ui_ta, ui_tl):
     | 1.81 ≤ Z ≤ 2.99 | ⚠️ Grey — caution |
     | Z < 1.81 | 🚨 Distress — high bankruptcy risk |
     """)
-    return compute_zscore, z, z_col, z_display, z_zone
+    return compute_zscore, z, z_display
 
 
 @app.cell
 def _(df_filtered, mo, n_obs, np, pd, px, stats):
-    # 9: Credit Risk Regression Analysis (Wk04 + Wk07–08)
+    # 7: Credit Risk Regression Analysis (Wk04 + Wk07–08)
 
-    _color_map = {
+    _cmap = {
         "1. Distress Zone (Z < 1.81)":    "red",
         "2. Grey Zone (1.81 ≤ Z ≤ 2.99)": "grey",
         "3. Safe Zone (Z > 2.99)":          "green",
     }
 
-    # OLS regression (scipy.stats.linregress — mirrors statsmodels OLS from Wk04)
-    _reg = df_filtered.dropna(subset=["Z_Score_lag","AvgCost_of_Debt"])
-    if len(_reg) > 5:
-        _sl, _int, _r, _p, _se = stats.linregress(
-            _reg["Z_Score_lag"], _reg["Debt_Cost_Pct"]
-        )
-        _r2  = round(_r**2, 4)
+    # OLS regression via scipy.stats.linregress (mirrors statsmodels OLS from Wk04)
+    _r = df_filtered.dropna(subset=["Z_Score_lag", "AvgCost_of_Debt"])
+    if len(_r) > 5:
+        _sl, _it, _rv, _p, _ = stats.linregress(_r["Z_Score_lag"], _r["Debt_Cost_Pct"])
+        _r2  = round(_rv**2, 4)
         _p_  = round(_p, 4)
         _sl_ = round(_sl, 4)
-        _sig = "✅ Statistically significant (p < 0.05)" if _p < 0.05 else "⚠️ Not significant (p ≥ 0.05)"
+        _sig = "✅ Statistically significant (p < 0.05)" if _p < 0.05 else "⚠️ Not significant"
     else:
         _r2 = _p_ = _sl_ = 0.0
         _sig = "⚠️ Insufficient data — adjust filters"
@@ -464,22 +410,22 @@ def _(df_filtered, mo, n_obs, np, pd, px, stats):
 
     | Statistic | Value | Interpretation |
     |---|---|---|
-    | Slope (β) | **{_sl_}** | 1-unit ↑ in Z-Score → {abs(_sl_):.3f}% {'↓' if _sl_ < 0 else '↑'} cost of debt |
-    | R² | **{_r2}** | {round(_r2*100,1)}% of variation in borrowing costs explained by credit risk |
+    | Slope (β) | **{_sl_}** | 1-unit ↑ in Z-Score → {abs(_sl_):.3f}% {'↓' if _sl_ < 0 else '↑'} in cost of debt |
+    | R² | **{_r2}** | {round(_r2*100,1)}% of variation explained by credit risk |
     | p-value | **{_p_}** | {_sig} |
     """)
 
-    # Scatter with regression line (Wk04 np.polyfit pattern)
+    # Scatter + regression line (Wk04 np.polyfit pattern)
     fig_scatter = px.scatter(
-        df_filtered.dropna(subset=["Z_Score_lag","Debt_Cost_Pct","Risk_Zone"]),
+        df_filtered.dropna(subset=["Z_Score_lag", "Debt_Cost_Pct", "Risk_Zone"]),
         x="Z_Score_lag", y="Debt_Cost_Pct",
-        color="Risk_Zone", color_discrete_map=_color_map,
-        hover_name="Name", hover_data=["Ticker","Year","Sector_Key"],
+        color="Risk_Zone", color_discrete_map=_cmap,
+        hover_name="Name", hover_data=["Ticker", "Year", "Sector_Key"],
         title=f"Cost of Debt vs. Lagged Z-Score ({n_obs} observations)",
-        labels={"Z_Score_lag":"Altman Z-Score (lagged)",
-                "Debt_Cost_Pct":"Avg. Cost of Debt (%)",
-                "Risk_Zone":"Risk Zone"},
-        template="plotly_white", height=480,
+        labels={"Z_Score_lag": "Altman Z-Score (lagged)",
+                "Debt_Cost_Pct": "Avg. Cost of Debt (%)",
+                "Risk_Zone": "Risk Zone"},
+        template="plotly_white", height=470,
     )
     fig_scatter.add_vline(x=1.81, line_dash="dash", line_color="red",
         annotation=dict(text="Distress (1.81)", font=dict(color="red"),
@@ -489,27 +435,26 @@ def _(df_filtered, mo, n_obs, np, pd, px, stats):
         annotation=dict(text="Safe (2.99)", font=dict(color="green"),
                         x=3.10, xref="x", y=1.02, yref="paper",
                         showarrow=False, yanchor="top"))
-    _cl = df_filtered.dropna(subset=["Z_Score_lag","Debt_Cost_Pct"])
+    _cl = df_filtered.dropna(subset=["Z_Score_lag", "Debt_Cost_Pct"])
     if len(_cl) > 5:
-        _x = _cl["Z_Score_lag"].astype(float)
-        _y = _cl["Debt_Cost_Pct"].astype(float)
+        _x  = _cl["Z_Score_lag"].astype(float)
+        _y  = _cl["Debt_Cost_Pct"].astype(float)
         _m, _b = np.polyfit(_x, _y, 1)
         _xl = np.linspace(_x.min(), _x.max(), 100)
         _rt = px.line(x=_xl, y=_m*_xl+_b).data[0]
         _rt.update(line=dict(width=1.5, color="black", dash="dot"), name="OLS Fit")
         fig_scatter.add_trace(_rt)
-
     scatter_chart = mo.ui.plotly(fig_scatter)
 
     # Box plot (Wk03)
     fig_box = px.box(
-        df_filtered.dropna(subset=["Risk_Zone","Debt_Cost_Pct"]),
+        df_filtered.dropna(subset=["Risk_Zone", "Debt_Cost_Pct"]),
         x="Risk_Zone", y="Debt_Cost_Pct",
-        color="Risk_Zone", color_discrete_map=_color_map,
+        color="Risk_Zone", color_discrete_map=_cmap,
         points="outliers", hover_data=["Name"],
         title="Distribution of Cost of Debt by Credit Risk Zone",
-        labels={"Debt_Cost_Pct":"Avg. Cost of Debt (%)","Risk_Zone":"Z-Score Zone"},
-        template="plotly_white", height=400,
+        labels={"Debt_Cost_Pct": "Avg. Cost of Debt (%)", "Risk_Zone": "Z-Score Zone"},
+        template="plotly_white", height=390,
     )
     fig_box.update_layout(showlegend=False)
     box_chart = mo.ui.plotly(fig_box)
@@ -532,7 +477,7 @@ def _(df_filtered, mo, n_obs, np, pd, px, stats):
 
 @app.cell
 def _(Counter, mo, pd, px, re, ui_nlp_min, ui_nlp_text):
-    # 10: NLP word and bigram frequency analysis (Wk10)
+    # 8: NLP word and bigram frequency analysis (Wk10)
 
     _STOP = {
         "the","a","an","and","or","but","in","on","at","to","for","of","with",
@@ -584,14 +529,16 @@ def _(Counter, mo, pd, px, re, ui_nlp_min, ui_nlp_text):
 
 @app.cell
 def _(
-    box_chart, crosstab_display, ko_hist_chart, ko_results_md, ko_tornado_chart,
+    box_chart, crosstab_display, ko_hist, ko_summary, ko_tornado,
     mo, nlp_big, nlp_stats, nlp_uni,
     reg_summary, scatter_chart,
-    ui_ca, ui_cl, ui_eb, ui_mc, ui_re, ui_sal, ui_sectors, ui_ta, ui_tl, ui_years,
+    ui_ca, ui_cl, ui_eb, ui_mc, ui_re, ui_sal,
+    ui_sectors, ui_ta, ui_tl, ui_years,
     ui_nlp_min, ui_nlp_text,
     z_display,
 ):
-    # 11: Assemble multi-tabbed portfolio (Wk04 — mo.ui.tabs, mo.vstack, mo.hstack, mo.callout)
+    # 9: Assemble the multi-tabbed portfolio
+    # Demonstrates: Wk04 — mo.ui.tabs, mo.vstack, mo.hstack, mo.callout
 
     # ── Tab 1: About Me ───────────────────────────────────────────────────────
     tab_about = mo.md("""
@@ -601,7 +548,7 @@ def _(
     - Motivated BSc Accounting & Finance student at Bayes Business School (Predicted: **1st Class**).
     - Independent investment book yielding **90%+ net profit**.
     - Shadowed a Partner at a boutique hedge fund overseeing **£500M+ in fixed-income assets**.
-    - Independently designed and deployed **NutriScan AI** — a live Firebase/Groq PWA,
+    - Independently designed and deployed **NutriScan AI** — a live Firebase/Gemini PWA,
       currently in initial beta testing. Applies LLM API skills from Week 09 of AF1204.
     - Actively contributing to a Fintech startup (FX solutions) — assisting with
       funding, design, and testing.
@@ -624,7 +571,7 @@ def _(
     | Programming | Python · Jupyter Notebook · Marimo |
     | Data & Visualisation | Pandas · NumPy · Plotly · Altair · SciPy |
     | Statistical Methods | OLS Regression · Monte Carlo · DCF Modelling · Hypothesis Testing |
-    | Web & AI | Playwright · spaCy NLP · Groq 1.5 Flash · Firebase · LLM APIs |
+    | Web & AI | Playwright · spaCy NLP · Gemini 1.5 Flash · Firebase · LLM APIs |
     | Finance Tools | yfinance · PyMuPDF · EViews · Bloomberg Terminal |
 
     ---
@@ -645,12 +592,12 @@ def _(
 
         mo.md("## 📊 Passion Projects — Interactive Data Demos"),
 
-        # Demo 1: Altman Z-Score (Wk01–02)
+        # Demo 1: Z-Score (Wk01–02)
         mo.md("### 📐 Demo 1: Altman Z-Score Calculator *(Weeks 01–02)*"),
         mo.callout(mo.md(
-            "Enter company financials. The Z-Score updates **reactively** — Marimo "
-            "re-runs the dependent cell automatically on every input change (Week 02). "
-            "The `try/except` block (Week 01) handles the edge case of zero liabilities, "
+            "Enter company financials. The Z-Score updates **reactively** without "
+            "re-running the notebook — this is Marimo's **reactive cell system** (Week 02). "
+            "The `try/except` block (Week 01) handles zero liabilities gracefully, "
             "returning `NaN` instead of crashing with a `ZeroDivisionError`."
         ), kind="info"),
         mo.hstack([
@@ -661,20 +608,19 @@ def _(
 
         mo.md("---"),
 
-        # Demo 2: Regression (Wk04 + Wk07–08)
+        # Demo 2: Credit risk regression (Wk04 + Wk07–08)
         mo.md("### 📉 Demo 2: Credit Risk Regression Analysis *(Weeks 04, 07–08)*"),
         mo.callout(mo.md(
-            "Replicates the **Wk04_DataPreparation** methodology exactly: OLS regression "
-            "of Average Cost of Debt on lagged Altman Z-Score, with interactive sector "
-            "and year filters. Techniques: `groupby().shift(1)` for lagged variables, "
-            "`apply(lambda x: ...)` for risk zones, `pd.crosstab()` for contingency "
-            "analysis, `np.polyfit` for the regression line, "
-            "`scipy.stats.linregress` for R² and p-value."
+            "Replicates the **Wk04_DataPreparation** methodology: OLS regression of "
+            "Average Cost of Debt on lagged Altman Z-Score with interactive filters. "
+            "Skills: `groupby().shift(1)` for lagged variables, `apply(lambda x: ...)` "
+            "for risk zone classification, `pd.crosstab()` for contingency analysis, "
+            "`np.polyfit` for the regression line, `scipy.stats.linregress` for R² and p-value."
         ), kind="info"),
         mo.hstack([ui_sectors, ui_years], justify="start", gap=4),
         reg_summary,
         scatter_chart,
-        mo.md("#### 📦 Distribution of Borrowing Costs by Risk Zone"),
+        mo.md("#### 📦 Distribution of Cost of Debt by Risk Zone"),
         box_chart,
         mo.md("#### 📋 Contingency Table (`pd.crosstab` + `apply/lambda`)"),
         crosstab_display,
@@ -684,19 +630,17 @@ def _(
         # Demo 3: KO Monte Carlo (Self-exploration)
         mo.md("### 🎯 Demo 3: Coca-Cola Acquisition — DCF Monte Carlo *(Self-exploration)*"),
         mo.callout(mo.md(
-            "A fully independent project built outside the module. "
-            "This runs a **10,000-iteration Monte Carlo simulation** of a DCF valuation "
-            "for Coca-Cola (KO), using FY2024 10-K/SEC data as inputs. "
-            "Six key assumptions are sampled simultaneously from statistical distributions "
-            "(Normal and Triangular), producing a probability distribution of intrinsic "
-            "equity value per share. The simulation is **vectorised with NumPy** for speed — "
-            "contrast with the original loop-based Jupyter notebook version which took "
-            "several minutes to run."
+            "A fully independent project built outside AF1204. Runs a **10,000-iteration "
+            "Monte Carlo simulation** of a DCF valuation for Coca-Cola (KO), using "
+            "FY2024 10-K/SEC data as inputs. Six assumptions are sampled simultaneously "
+            "from statistical distributions (Normal + Triangular). "
+            "The model is **vectorised with NumPy** — significantly faster than the "
+            "original loop-based Jupyter version."
         ), kind="info"),
-        ko_results_md,
-        ko_hist_chart,
-        mo.md("#### 🌪 Sensitivity Analysis — Which Input Drives Value Most?"),
-        ko_tornado_chart,
+        ko_summary,
+        ko_hist,
+        mo.md("#### 🌪 Sensitivity Analysis — What Drives Value Most?"),
+        ko_tornado,
     ])
 
     # ── Tab 3: Technical Journey ──────────────────────────────────────────────
@@ -713,8 +657,8 @@ def _(
         | 03 | Interactive Plotly | Violin, joyplot, 3D scatter, `zip()`, colour scales |
         | 04 | Data Prep & Portfolio | `groupby().shift()`, `apply/lambda`, `pd.crosstab`, OLS, `mo.ui.tabs` |
         | 06–07 | Web Scraping + OCR | Playwright `async/await`, shadow DOM evasion, PyMuPDF, Tesseract OCR |
-        | 08 | Statistical Analysis | OLS regression, R², p-value interpretation, `scipy.stats` |
-        | 09 | LLM API | Groq API Key, multi-modal prompting, JSON response parsing |
+        | 08 | Statistical Analysis | OLS regression, R², p-value, `scipy.stats`, `statsmodels` |
+        | 09 | LLM API | Gemini 1.5 Flash, multi-modal prompting, JSON response parsing |
         | 10 | NLP & Word Clouds | spaCy transformer, bigrams, lemmatisation, `Counter`, word clouds |
         """),
 
@@ -723,8 +667,8 @@ def _(
         mo.callout(mo.md(
             "Applies the **tokenisation, stopword removal, and bigram counting** pipeline "
             "from Week 10 — the same approach used on SEC 10-K Risk Factor sections for "
-            "the Magnificent 7 companies in `Wk10_BigramCloud_GPUorCPU_Moodle.py`. "
-            "Paste any financial text below."
+            "the Magnificent 7 in `Wk10_BigramCloud_GPUorCPU_Moodle.py`. "
+            "Paste any financial text and adjust the minimum frequency slider."
         ), kind="info"),
         mo.hstack([ui_nlp_text, ui_nlp_min], justify="start", gap=2),
         nlp_stats,
@@ -744,7 +688,7 @@ def _(
 
         ### 🤖 Week 09: LLM API — Applied via NutriScan AI
 
-        - Structured multi-modal prompts sent to **Groq API Key** via OpenRouter
+        - Structured multi-modal prompts sent to **Gemini 1.5 Flash** via OpenRouter
         - JSON nutrition estimates parsed from image, label, and natural-language inputs
         - Weekly personalised AI insight paragraphs generated for each user
         """),
@@ -757,7 +701,7 @@ def _(
 
         ### 📱 NutriScan AI — Live App *(Initial Beta Testing)*
 
-        An independently built **Progressive Web App (PWA)** using **Groq ** AI
+        An independently built **Progressive Web App (PWA)** using **Gemini 1.5 Flash** AI
         to scan meals from photos, labels, and barcodes — estimating calories and protein.
 
         **Live:** [food-app-cb863.web.app](https://food-app-cb863.web.app/)
@@ -765,24 +709,23 @@ def _(
         | Feature | Details |
         |---|---|
         | 📸 Photo scanning | AI estimates calories & protein from a plate photo |
-        | 🏷️ Label OCR | Reads exact values from packaged food nutrition labels |
+        | 🏷️ Label OCR | Reads nutrition values from packaged food labels |
         | 📦 Barcode scanner | EAN/UPC lookup via Open Food Facts |
         | ✍️ Natural language | "Bowl of pasta with chicken" — AI estimates macros |
         | 🔥 Streak & Badges | 7-day tracker, 8 achievement badges |
         | 📈 Progress charts | 14-day weight & body fat line charts |
-        | 🤖 Weekly AI insight | Personalised Groq paragraph about your week |
+        | 🤖 Weekly AI insight | Personalised Gemini paragraph about your week |
         | ☁️ Cloud sync | Firebase Firestore for multi-device data |
 
-        **Stack:** Firebase Hosting · Firestore · Groq 1.5 Flash · OpenRouter · Vanilla JS
+        **Stack:** Firebase Hosting · Firestore · Gemini 1.5 Flash · OpenRouter · Vanilla JS
 
         ---
 
         ### 📈 10,000-Iteration Monte Carlo LBO Model (Coca-Cola)
 
-        See **Passion Projects → Demo 3** for the full live simulation. Built from scratch
-        using FY2024 10-K/SEC data — three-statement model → DCF → Monte Carlo.
-
-        *Tools: Python · NumPy · SciPy · Jupyter · Excel · SEC EDGAR*
+        See **Passion Projects → Demo 3** for the full live simulation.
+        Built from scratch using FY2024 KO 10-K/SEC data — full three-statement model
+        → DCF → 10,000-iteration Monte Carlo. *Tools: Python · NumPy · SciPy · Excel.*
 
         ---
 
@@ -796,11 +739,12 @@ def _(
 
         ### 🎯 Hobbies
 
-        🎹 Piano · ⚽ First-team football · 🏏 County Cup cricket · ♟ Regional chess · 🚴 Cycling
+        🎹 Piano · ⚽ First-team football · 🏏 County Cup cricket ·
+        ♟ Regional chess · 🚴 Cycling
         """),
     ])
 
-    # ── Assemble and display ──────────────────────────────────────────────────
+    # ── Assemble tabs and display ─────────────────────────────────────────────
     portfolio_tabs = mo.ui.tabs({
         "📄 About Me":           tab_about,
         "📊 Passion Projects":   tab_projects,
