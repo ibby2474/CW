@@ -8,8 +8,6 @@
 #   "scipy>=1.11.0",
 #   "pyzmq>=27.1.0",
 #   "tabulate>=0.9.0",
-#   "playwright>=1.50.0",
-#   "playwright-stealth>=2.0.0",
 # ]
 # ///
 
@@ -19,24 +17,19 @@ __generated_with = "0.19.11"
 app = marimo.App()
 
 
+# ---------------------------------------------------------------------------
+# CELL 1: Imports
+# ---------------------------------------------------------------------------
 @app.cell
 def _():
-    # 1: Auto-install any missing packages, then import everything.
-    # This runs silently before the imports so the notebook always works
-    # regardless of which kernel or environment you are running in.
     import subprocess
     import sys
-
     _packages = ["plotly", "scipy", "pandas", "numpy", "tabulate"]
     for _pkg in _packages:
         try:
             __import__(_pkg)
         except ImportError:
-            subprocess.run(
-                [sys.executable, "-m", "pip", "install", _pkg, "-q"],
-                check=False
-            )
-
+            subprocess.run([sys.executable, "-m", "pip", "install", _pkg, "-q"], check=False)
     import marimo as mo
     import pandas as pd
     import numpy as np
@@ -48,26 +41,57 @@ def _():
     return Counter, go, mo, np, pd, px, re, stats
 
 
+# ---------------------------------------------------------------------------
+# CELL 2: Cookie dropdown — defined here, displayed in Cell 3
+# ---------------------------------------------------------------------------
 @app.cell
 def _(mo):
-    mo.md(r"""
-    ---
-    ## 🎓 Personal Portfolio Webpage — Ibrahim Khan
-
-    A multi-tabbed personal portfolio demonstrating data literacy skills developed
-    across **AF1204** (Weeks 1–10), plus self-directed exploration of AI, Monte Carlo
-    valuation modelling, NLP, and a live deployed app (NutriScan AI).
-
-    ---
-    """)
-    return
+    cookie_choice = mo.ui.dropdown(
+        options={
+            "✅ Accept All Cookies": "accepted",
+            "❌ Reject Non-Essential": "rejected",
+        },
+        label="🍪 Cookie Preferences — please make a selection to continue:",
+    )
+    return cookie_choice,
 
 
+# ---------------------------------------------------------------------------
+# CELL 3: Show cookie banner or confirmation. Exports cookie_state.
+# ---------------------------------------------------------------------------
+@app.cell
+def _(cookie_choice, mo):
+    if cookie_choice.value == "accepted":
+        cookie_state = True
+        _banner = mo.vstack([
+            cookie_choice,
+            mo.callout(
+                mo.md("✅ **Cookies accepted.** The portfolio is loading below."),
+                kind="success",
+            ),
+        ])
+    elif cookie_choice.value == "rejected":
+        cookie_state = False
+        _banner = mo.vstack([
+            cookie_choice,
+            mo.callout(
+                mo.md("❌ **Non-essential cookies rejected.** Only essential cookies are active. The portfolio is loading below."),
+                kind="warn",
+            ),
+        ])
+    else:
+        cookie_state = None
+        _banner = cookie_choice
+
+    _banner
+    return cookie_state,
+
+
+# ---------------------------------------------------------------------------
+# CELL 4: Synthetic credit risk dataset
+# ---------------------------------------------------------------------------
 @app.cell
 def _(np, pd):
-    # 2: Synthetic credit risk dataset (mirrors Wk04_DataPreparation structure)
-    # Z-Score, Average Cost of Debt, Sector, Year
-
     np.random.seed(7)
     SECTORS = [
         "technology", "financial-services", "healthcare",
@@ -75,7 +99,6 @@ def _(np, pd):
         "communication-services", "consumer-defensive",
     ]
     YEARS = [2021, 2022, 2023, 2024]
-
     rows = []
     for _fid in range(60):
         _sec  = SECTORS[_fid % len(SECTORS)]
@@ -90,44 +113,31 @@ def _(np, pd):
                 "Z_Score":         round(max(0.1, _bz + np.random.normal(0, 0.4)), 3),
                 "AvgCost_of_Debt": round(max(0.003, _bcod + np.random.normal(0, 0.008)), 5),
             })
-
     df_raw = pd.DataFrame(rows)
-
-    # Wk04 skill: groupby + shift(1) for lagged Z-Score
     df_raw["Z_Score_lag"] = (
         df_raw.sort_values(["Ticker", "Year"])
         .groupby("Ticker")["Z_Score"].shift(1)
     )
-    # Wk04 skill: apply + lambda for risk zone classification
     df_raw["Risk_Zone"] = df_raw["Z_Score_lag"].apply(
         lambda z: (
-            "1. Distress Zone (Z < 1.81)"     if z < 1.81 else
-            "3. Safe Zone (Z > 2.99)"           if z > 2.99 else
+            "1. Distress Zone (Z < 1.81)"    if z < 1.81 else
+            "3. Safe Zone (Z > 2.99)"          if z > 2.99 else
             "2. Grey Zone (1.81 ≤ Z ≤ 2.99)"
         ) if pd.notna(z) else np.nan
     )
     df_raw["Debt_Cost_Pct"] = df_raw["AvgCost_of_Debt"] * 100
     df_fin = df_raw.dropna(subset=["Z_Score_lag", "AvgCost_of_Debt", "Risk_Zone"]).copy()
     df_fin = df_fin[df_fin["AvgCost_of_Debt"] < 0.30]
-
-    print(f"Dataset: {len(df_fin)} obs · "
-          f"{df_fin['Ticker'].nunique()} companies · "
-          f"{df_fin['Year'].nunique()} years · "
-          f"{df_fin['Sector_Key'].nunique()} sectors.")
     return df_fin, df_raw
 
 
+# ---------------------------------------------------------------------------
+# CELL 5: KO Monte Carlo
+# ---------------------------------------------------------------------------
 @app.cell
 def _(go, mo, np):
-    # 3: Coca-Cola DCF Monte Carlo — 10,000 iterations
-    # Built independently outside the module using FY2024 KO 10-K/SEC filings.
-    # Vectorised with NumPy (vs the original loop-based Jupyter version).
-    # np.random.seed(42) reproduces the exact same results as the Jupyter notebook.
-
     np.random.seed(42)
     N_ITER = 10_000
-
-    # Stochastic inputs sampled from distributions (Assumptions sheet)
     rev_g1   = np.clip(np.random.normal(0.040, 0.015, N_ITER),      0.01, 0.08)
     rev_g25  = np.clip(np.random.normal(0.040, 0.012, (N_ITER, 4)), 0.01, 0.08)
     ebitda_m = np.clip(np.random.normal(0.345, 0.020, N_ITER),      0.30, 0.40)
@@ -135,23 +145,13 @@ def _(go, mo, np):
     wacc     = np.clip(np.random.normal(0.061, 0.005, N_ITER),      0.05, 0.075)
     capex_p  = np.clip(np.random.normal(0.045, 0.005, N_ITER),      0.03, 0.06)
     dso      = np.clip(np.random.normal(31.6,  2.0,   N_ITER),      25,   40)
-
-    # Fixed constants from KO FY2024 10-K
-    REV_2024   = 47.1
-    TAX_RATE   = 0.205
-    DA_PCT     = 0.038
-    SHARES_OUT = 4.3
-    CASH       = 9.5
-    TOTAL_DEBT = 39.0
-
-    # Vectorised 5-year revenue projection
+    REV_2024 = 47.1; TAX_RATE = 0.205; DA_PCT = 0.038
+    SHARES_OUT = 4.3; CASH = 9.5; TOTAL_DEBT = 39.0
     rev = np.zeros((N_ITER, 6))
     rev[:, 0] = REV_2024
     rev[:, 1] = REV_2024 * (1 + rev_g1)
     for _yr in range(4):
         rev[:, _yr + 2] = rev[:, _yr + 1] * (1 + rev_g25[:, _yr])
-
-    # Vectorised FCF calculation across all 5 projection years
     pv_explicit = np.zeros(N_ITER)
     for _i in range(5):
         yr_rev   = rev[:, _i + 1]
@@ -161,39 +161,24 @@ def _(go, mo, np):
         op_cf    = nopat + da
         capex    = yr_rev * capex_p
         delta_wc = (rev[:, _i + 1] - rev[:, _i]) * (dso / 365)
-        fcf      = (op_cf - capex - delta_wc) * 0.5      # mid-year adjustment
+        fcf      = (op_cf - capex - delta_wc) * 0.5
         pv_explicit += fcf / (1 + wacc) ** (_i + 0.5)
-
-    # Terminal value via EV/EBITDA exit multiple
     pv_terminal  = (rev[:, 5] * ebitda_m * exit_m) / (1 + wacc) ** 5
-    ev_per_share = np.clip(
-        (pv_explicit + pv_terminal + CASH - TOTAL_DEBT) / SHARES_OUT, 0, None
-    )
-
-    # Summary statistics
-    ko_p5   = float(np.percentile(ev_per_share,  5))
-    ko_p25  = float(np.percentile(ev_per_share, 25))
-    ko_p50  = float(np.percentile(ev_per_share, 50))
-    ko_p75  = float(np.percentile(ev_per_share, 75))
-    ko_p95  = float(np.percentile(ev_per_share, 95))
+    ev_per_share = np.clip((pv_explicit + pv_terminal + CASH - TOTAL_DEBT) / SHARES_OUT, 0, None)
+    ko_p5  = float(np.percentile(ev_per_share,  5))
+    ko_p25 = float(np.percentile(ev_per_share, 25))
+    ko_p50 = float(np.percentile(ev_per_share, 50))
+    ko_p75 = float(np.percentile(ev_per_share, 75))
+    ko_p95 = float(np.percentile(ev_per_share, 95))
     ko_mean = float(ev_per_share.mean())
     ko_std  = float(ev_per_share.std())
     ko_p_above70 = float(np.mean(ev_per_share > 70) * 100)
     ko_p_above60 = float(np.mean(ev_per_share > 60) * 100)
     ko_p_below50 = float(np.mean(ev_per_share < 50) * 100)
-
-    print(f"KO Monte Carlo: 10,000 iterations complete.")
-    print(f"Median ${ko_p50:.2f} | Mean ${ko_mean:.2f} | "
-          f"5th pct ${ko_p5:.2f} | 95th pct ${ko_p95:.2f}")
-
-    # ── Histogram ─────────────────────────────────────────────────────────────
     fig_ko = go.Figure()
-    fig_ko.add_trace(go.Histogram(
-        x=ev_per_share, nbinsx=80,
-        marker_color="rgba(52,152,219,0.7)",
-        marker_line=dict(width=0.3, color="white"),
-        name="Simulated values",
-    ))
+    fig_ko.add_trace(go.Histogram(x=ev_per_share, nbinsx=80,
+        marker_color="rgba(52,152,219,0.7)", marker_line=dict(width=0.3, color="white"),
+        name="Simulated values"))
     for _x0, _x1, _col in [
         (ko_p5,  ko_p25, "rgba(231,76,60,0.12)"),
         (ko_p25, ko_p75, "rgba(46,204,113,0.10)"),
@@ -201,82 +186,55 @@ def _(go, mo, np):
     ]:
         fig_ko.add_vrect(x0=_x0, x1=_x1, fillcolor=_col, layer="below", line_width=0)
     for _v, _c, _lbl, _d in [
-        (ko_p50,  "white",  f"Median ${ko_p50:.2f}",         "solid"),
-        (ko_mean, "yellow", f"Mean ${ko_mean:.2f}",           "dash"),
-        (ko_p5,   "red",    f"5th pct ${ko_p5:.2f}",         "dot"),
-        (ko_p95,  "green",  f"95th pct ${ko_p95:.2f}",       "dot"),
-        (68.19,   "orange", "DCF Base Case $68.19",           "dashdot"),
+        (ko_p50,  "white",  f"Median ${ko_p50:.2f}",   "solid"),
+        (ko_mean, "yellow", f"Mean ${ko_mean:.2f}",     "dash"),
+        (ko_p5,   "red",    f"5th ${ko_p5:.2f}",        "dot"),
+        (ko_p95,  "green",  f"95th ${ko_p95:.2f}",      "dot"),
+        (68.19,   "orange", "Base Case $68.19",          "dashdot"),
     ]:
         fig_ko.add_vline(x=_v, line_color=_c, line_dash=_d, line_width=1.8,
-                         annotation_text=_lbl, annotation_font_color=_c,
-                         annotation_position="top")
+            annotation_text=_lbl, annotation_font_color=_c, annotation_position="top")
     fig_ko.update_layout(
-        title="KO Equity Value Per Share Distribution — 10,000 Monte Carlo Iterations",
-        xaxis_title="Equity Value Per Share ($)",
-        yaxis_title="Frequency",
-        template="plotly_dark", height=460,
-        showlegend=False, bargap=0.02,
-        xaxis=dict(range=[35, 100]),
-    )
+        title="KO Equity Value Per Share — 10,000 Monte Carlo Iterations",
+        xaxis_title="Equity Value Per Share ($)", yaxis_title="Frequency",
+        template="plotly_dark", height=460, showlegend=False, bargap=0.02,
+        xaxis=dict(range=[35, 100]))
     ko_hist = mo.as_html(fig_ko)
-
-    # ── Tornado chart ─────────────────────────────────────────────────────────
     import pandas as _pd2
     _sens = _pd2.DataFrame({
-        "Variable": ["Exit Multiple", "EBITDA Margin", "Revenue Growth Y1",
-                     "WACC", "Capex %", "Revenue Growth Y2-5", "DSO"],
+        "Variable": ["Exit Multiple","EBITDA Margin","Revenue Growth Y1","WACC","Capex %","Revenue Growth Y2-5","DSO"],
         "Impact":   [8.4, 5.1, 3.2, -2.8, -1.9, 1.6, -0.7],
     }).sort_values("Impact")
-    _colors = ["#e74c3c" if v < 0 else "#2ecc71" for v in _sens["Impact"]]
     fig_tornado = go.Figure(go.Bar(
         x=_sens["Impact"], y=_sens["Variable"], orientation="h",
-        marker_color=_colors,
-    ))
+        marker_color=["#e74c3c" if v < 0 else "#2ecc71" for v in _sens["Impact"]]))
     fig_tornado.update_layout(
         title="Sensitivity — Impact on Equity Value Per Share ($)",
         xaxis_title="Impact ($)", template="plotly_dark", height=320,
-        xaxis=dict(zeroline=True, zerolinecolor="white", zerolinewidth=1.5),
-    )
+        xaxis=dict(zeroline=True, zerolinecolor="white", zerolinewidth=1.5))
     ko_tornado = mo.as_html(fig_tornado)
-
-    # ── Written summary ───────────────────────────────────────────────────────
     ko_summary = mo.md(f"""
-    **Model:** Full three-statement financial model built from KO FY2024 10-K/SEC data
-    ($47.1B revenue · $9.5B cash · $39.0B debt · 4.3B shares outstanding),
-    followed by a 5-year DCF with EV/EBITDA exit multiple terminal value.
-    Six key assumptions are simultaneously sampled from statistical distributions
-    (Normal and Triangular) across **10,000 iterations**.
+**Model:** Full three-statement financial model built from KO FY2024 10-K/SEC data
+($47.1B revenue · $9.5B cash · $39.0B debt · 4.3B shares outstanding),
+followed by a 5-year DCF with EV/EBITDA exit multiple terminal value.
+Six key assumptions simultaneously sampled from statistical distributions across **10,000 iterations**.
 
-    ---
+---
 
-    | Metric | Value |
-    |---|---|
-    | 5th Percentile (Bear) | **${ko_p5:.2f}** |
-    | 25th Percentile | **${ko_p25:.2f}** |
-    | **Median (50th)** | **${ko_p50:.2f}** |
-    | 75th Percentile | **${ko_p75:.2f}** |
-    | 95th Percentile (Bull) | **${ko_p95:.2f}** |
-    | Mean | **${ko_mean:.2f}** |
-    | Std. Deviation | **±${ko_std:.2f}** |
+| Metric | Value |
+|---|---|
+| 5th Percentile (Bear) | **${ko_p5:.2f}** |
+| 25th Percentile | **${ko_p25:.2f}** |
+| **Median (50th)** | **${ko_p50:.2f}** |
+| 75th Percentile | **${ko_p75:.2f}** |
+| 95th Percentile (Bull) | **${ko_p95:.2f}** |
+| Mean | **${ko_mean:.2f}** |
+| Std. Deviation | **±${ko_std:.2f}** |
 
-    **Probability Analysis:**
-    P(Value > $70) = **{ko_p_above70:.1f}%** &nbsp;|&nbsp;
-    P(Value > $60) = **{ko_p_above60:.1f}%** &nbsp;|&nbsp;
-    P(Value < $50) = **{ko_p_below50:.1f}%**
-
-    ---
-
-    **Key Findings:**
-    The median intrinsic value of **${ko_p50:.2f}** aligns closely with the
-    deterministic DCF base case of **$68.19**, validating the model's internal
-    consistency. The tight interquartile range (**${ko_p25:.2f}–${ko_p75:.2f}**)
-    reflects Coca-Cola's defensive, low-volatility business model with stable margins.
-    The **exit multiple** is the single largest driver of value (~$8.40/share),
-    highlighting the sensitivity of terminal value to market pricing assumptions.
-    Against KO's 52-week range of **$57.93–$73.53**, the simulation supports
-    a **HOLD recommendation** — the stock appears close to fair value.
+P(Value > $70) = **{ko_p_above70:.1f}%** &nbsp;|&nbsp;
+P(Value > $60) = **{ko_p_above60:.1f}%** &nbsp;|&nbsp;
+P(Value < $50) = **{ko_p_below50:.1f}%**
     """)
-
     return (
         ev_per_share, ko_hist, ko_mean, ko_p5, ko_p25, ko_p50,
         ko_p75, ko_p95, ko_p_above60, ko_p_above70, ko_p_below50,
@@ -284,11 +242,11 @@ def _(go, mo, np):
     )
 
 
+# ---------------------------------------------------------------------------
+# CELL 6: UI controls
+# ---------------------------------------------------------------------------
 @app.cell
 def _(df_fin, mo):
-    # 4: Define all UI controls
-
-    # Z-Score inputs (Wk01–02: mo.ui.number)
     ui_ta  = mo.ui.number(value=100_000, label="Total Assets ($)")
     ui_ca  = mo.ui.number(value=40_000,  label="Current Assets ($)")
     ui_cl  = mo.ui.number(value=20_000,  label="Current Liabilities ($)")
@@ -297,20 +255,11 @@ def _(df_fin, mo):
     ui_tl  = mo.ui.number(value=50_000,  label="Total Liabilities ($)")
     ui_sal = mo.ui.number(value=120_000, label="Total Sales / Revenue ($)")
     ui_mc  = mo.ui.number(value=80_000,  label="Market Capitalisation ($)")
-
-    # Regression filters (Wk04: mo.ui.multiselect)
     all_sectors = sorted(df_fin["Sector_Key"].unique().tolist())
-    ui_sectors  = mo.ui.multiselect(
-        options=all_sectors, value=all_sectors[:4], label="Filter by Sector",
-    )
+    ui_sectors = mo.ui.multiselect(options=all_sectors, value=all_sectors[:4], label="Filter by Sector")
     all_years = sorted(df_fin["Year"].unique().tolist())
-    ui_years  = mo.ui.multiselect(
-        options=[str(y) for y in all_years],
-        value=[str(y) for y in all_years],
-        label="Filter by Year",
-    )
-
-    # NLP text input (Wk10: mo.ui.text_area)
+    ui_years = mo.ui.multiselect(
+        options=[str(y) for y in all_years], value=[str(y) for y in all_years], label="Filter by Year")
     ui_nlp_text = mo.ui.text_area(
         value=(
             "The company faces significant cybersecurity threats and data breaches. "
@@ -323,19 +272,19 @@ def _(df_fin, mo):
         label="Paste any financial or business text (e.g. a 10-K risk factor section):",
         rows=6,
     )
-    ui_nlp_min = mo.ui.slider(start=1, stop=4, step=1, value=1,
-                              label="Min word frequency")
-
+    ui_nlp_min = mo.ui.slider(start=1, stop=4, step=1, value=1, label="Min word frequency")
     return (
         ui_ca, ui_cl, ui_eb, ui_mc, ui_re, ui_sal, ui_ta, ui_tl,
         ui_nlp_min, ui_nlp_text, ui_sectors, ui_years,
     )
 
 
+# ---------------------------------------------------------------------------
+# CELL 7: Reactive filtering
+# ---------------------------------------------------------------------------
 @app.cell
 def _(df_fin, ui_sectors, ui_years):
-    # 5: Reactive data filtering (Wk04)
-    _years_int  = [int(y) for y in ui_years.value]
+    _years_int = [int(y) for y in ui_years.value]
     df_filtered = df_fin[
         (df_fin["Sector_Key"].isin(ui_sectors.value)) &
         (df_fin["Year"].isin(_years_int))
@@ -344,25 +293,21 @@ def _(df_fin, ui_sectors, ui_years):
     return df_filtered, n_obs
 
 
+# ---------------------------------------------------------------------------
+# CELL 8: Z-Score
+# ---------------------------------------------------------------------------
 @app.cell
 def _(mo, np, ui_ca, ui_cl, ui_eb, ui_mc, ui_re, ui_sal, ui_ta, ui_tl):
-    # 6: Reactive Z-Score computation (Wk01–02)
-
     def compute_zscore(ta, ca, cl, re_e, ebit, tl, s, mktcap):
-        """Altman Z-Score — try/except handles zero-liabilities edge case (Wk01)."""
         try:
             return round(
                 1.2*((ca-cl)/ta) + 1.4*(re_e/ta) + 3.3*(ebit/ta) +
-                0.6*(mktcap/tl) + 1.0*(s/ta), 3
-            )
+                0.6*(mktcap/tl) + 1.0*(s/ta), 3)
         except ZeroDivisionError:
             return float("nan")
-
     z = compute_zscore(
         ui_ta.value, ui_ca.value, ui_cl.value, ui_re.value,
-        ui_eb.value, ui_tl.value, ui_sal.value, ui_mc.value,
-    )
-
+        ui_eb.value, ui_tl.value, ui_sal.value, ui_mc.value)
     if np.isnan(z):
         _zone, _col = "Undefined (zero liabilities)", "grey"
     elif z > 2.99:
@@ -371,117 +316,88 @@ def _(mo, np, ui_ca, ui_cl, ui_eb, ui_mc, ui_re, ui_sal, ui_ta, ui_tl):
         _zone, _col = "GREY ZONE ⚠️", "orange"
     else:
         _zone, _col = "DISTRESS ZONE 🚨", "red"
-
     z_display = mo.md(f"""
-    ### Altman Z-Score: **{z if not np.isnan(z) else "N/A"}**
+### Altman Z-Score: **{z if not np.isnan(z) else "N/A"}**
+**Zone:** <span style='color:{_col}; font-weight:700;'>{_zone}</span>
 
-    **Zone:** <span style='color:{_col}; font-weight:700;'>{_zone}</span>
-
-    | Threshold | Interpretation |
-    |---|---|
-    | Z > 2.99 | ✅ Safe — low bankruptcy risk |
-    | 1.81 ≤ Z ≤ 2.99 | ⚠️ Grey — caution |
-    | Z < 1.81 | 🚨 Distress — high bankruptcy risk |
+| Threshold | Interpretation |
+|---|---|
+| Z > 2.99 | ✅ Safe — low bankruptcy risk |
+| 1.81 ≤ Z ≤ 2.99 | ⚠️ Grey — caution |
+| Z < 1.81 | 🚨 Distress — high bankruptcy risk |
     """)
     return compute_zscore, z, z_display
 
 
+# ---------------------------------------------------------------------------
+# CELL 9: Regression + charts
+# ---------------------------------------------------------------------------
 @app.cell
 def _(df_filtered, mo, n_obs, np, pd, px, stats):
-    # 7: Credit Risk Regression Analysis (Wk04 + Wk07–08)
-
     _cmap = {
         "1. Distress Zone (Z < 1.81)":    "red",
         "2. Grey Zone (1.81 ≤ Z ≤ 2.99)": "grey",
         "3. Safe Zone (Z > 2.99)":          "green",
     }
-
-    # OLS regression via scipy.stats.linregress (mirrors statsmodels OLS from Wk04)
     _r = df_filtered.dropna(subset=["Z_Score_lag", "AvgCost_of_Debt"])
     if len(_r) > 5:
         _sl, _it, _rv, _p, _ = stats.linregress(_r["Z_Score_lag"], _r["Debt_Cost_Pct"])
-        _r2  = round(_rv**2, 4)
-        _p_  = round(_p, 4)
-        _sl_ = round(_sl, 4)
+        _r2 = round(_rv**2, 4); _p_ = round(_p, 4); _sl_ = round(_sl, 4)
         _sig = "✅ Statistically significant (p < 0.05)" if _p < 0.05 else "⚠️ Not significant"
     else:
         _r2 = _p_ = _sl_ = 0.0
         _sig = "⚠️ Insufficient data — adjust filters"
-
     reg_summary = mo.md(f"""
-    **OLS Regression:** Avg. Cost of Debt ~ Lagged Z-Score &nbsp;|&nbsp; n = **{n_obs}**
+**OLS Regression:** Avg. Cost of Debt ~ Lagged Z-Score &nbsp;|&nbsp; n = **{n_obs}**
 
-    | Statistic | Value | Interpretation |
-    |---|---|---|
-    | Slope (β) | **{_sl_}** | 1-unit ↑ in Z-Score → {abs(_sl_):.3f}% {'↓' if _sl_ < 0 else '↑'} in cost of debt |
-    | R² | **{_r2}** | {round(_r2*100,1)}% of variation explained by credit risk |
-    | p-value | **{_p_}** | {_sig} |
+| Statistic | Value | Interpretation |
+|---|---|---|
+| Slope (β) | **{_sl_}** | 1-unit ↑ in Z-Score → {abs(_sl_):.3f}% {'↓' if _sl_ < 0 else '↑'} in cost of debt |
+| R² | **{_r2}** | {round(_r2*100,1)}% of variation explained by credit risk |
+| p-value | **{_p_}** | {_sig} |
     """)
-
-    # Scatter + regression line (Wk04 np.polyfit pattern)
     fig_scatter = px.scatter(
         df_filtered.dropna(subset=["Z_Score_lag", "Debt_Cost_Pct", "Risk_Zone"]),
-        x="Z_Score_lag", y="Debt_Cost_Pct",
-        color="Risk_Zone", color_discrete_map=_cmap,
+        x="Z_Score_lag", y="Debt_Cost_Pct", color="Risk_Zone", color_discrete_map=_cmap,
         hover_name="Name", hover_data=["Ticker", "Year", "Sector_Key"],
         title=f"Cost of Debt vs. Lagged Z-Score ({n_obs} observations)",
-        labels={"Z_Score_lag": "Altman Z-Score (lagged)",
-                "Debt_Cost_Pct": "Avg. Cost of Debt (%)",
-                "Risk_Zone": "Risk Zone"},
-        template="plotly_white", height=470,
-    )
+        labels={"Z_Score_lag": "Altman Z-Score (lagged)", "Debt_Cost_Pct": "Avg. Cost of Debt (%)", "Risk_Zone": "Risk Zone"},
+        template="plotly_white", height=470)
     fig_scatter.add_vline(x=1.81, line_dash="dash", line_color="red",
-        annotation=dict(text="Distress (1.81)", font=dict(color="red"),
-                        x=1.5, xref="x", y=1.07, yref="paper",
-                        showarrow=False, yanchor="top"))
+        annotation=dict(text="Distress (1.81)", font=dict(color="red"), x=1.5, xref="x", y=1.07, yref="paper", showarrow=False, yanchor="top"))
     fig_scatter.add_vline(x=2.99, line_dash="dash", line_color="green",
-        annotation=dict(text="Safe (2.99)", font=dict(color="green"),
-                        x=3.10, xref="x", y=1.02, yref="paper",
-                        showarrow=False, yanchor="top"))
+        annotation=dict(text="Safe (2.99)", font=dict(color="green"), x=3.10, xref="x", y=1.02, yref="paper", showarrow=False, yanchor="top"))
     _cl = df_filtered.dropna(subset=["Z_Score_lag", "Debt_Cost_Pct"])
     if len(_cl) > 5:
-        _x  = _cl["Z_Score_lag"].astype(float)
-        _y  = _cl["Debt_Cost_Pct"].astype(float)
-        _m, _b = np.polyfit(_x, _y, 1)
-        _xl = np.linspace(_x.min(), _x.max(), 100)
+        _x = _cl["Z_Score_lag"].astype(float); _y = _cl["Debt_Cost_Pct"].astype(float)
+        _m, _b = np.polyfit(_x, _y, 1); _xl = np.linspace(_x.min(), _x.max(), 100)
         _rt = px.line(x=_xl, y=_m*_xl+_b).data[0]
         _rt.update(line=dict(width=1.5, color="black", dash="dot"), name="OLS Fit")
         fig_scatter.add_trace(_rt)
     scatter_chart = mo.ui.plotly(fig_scatter)
-
-    # Box plot (Wk03)
     fig_box = px.box(
         df_filtered.dropna(subset=["Risk_Zone", "Debt_Cost_Pct"]),
-        x="Risk_Zone", y="Debt_Cost_Pct",
-        color="Risk_Zone", color_discrete_map=_cmap,
+        x="Risk_Zone", y="Debt_Cost_Pct", color="Risk_Zone", color_discrete_map=_cmap,
         points="outliers", hover_data=["Name"],
         title="Distribution of Cost of Debt by Credit Risk Zone",
         labels={"Debt_Cost_Pct": "Avg. Cost of Debt (%)", "Risk_Zone": "Z-Score Zone"},
-        template="plotly_white", height=390,
-    )
+        template="plotly_white", height=390)
     fig_box.update_layout(showlegend=False)
     box_chart = mo.ui.plotly(fig_box)
-
-    # Contingency table (Wk04: pd.crosstab + apply/lambda)
     _med = df_filtered["AvgCost_of_Debt"].median()
-    _tb  = df_filtered.copy()
+    _tb = df_filtered.copy()
     _tb["Cost_Label"] = _tb["AvgCost_of_Debt"].apply(
-        lambda x: "Higher (Above Median)" if x > _med else "Lower (Below Median)"
-    )
-    _ct = pd.crosstab(index=_tb["Cost_Label"], columns=_tb["Risk_Zone"],
-                      margins=True, margins_name="Total")
-    crosstab_display = mo.md(
-        "**Contingency Table** — Cost of Debt (row) vs. Risk Zone (col):\n\n"
-        + _ct.to_markdown()
-    )
-
+        lambda x: "Higher (Above Median)" if x > _med else "Lower (Below Median)")
+    _ct = pd.crosstab(index=_tb["Cost_Label"], columns=_tb["Risk_Zone"], margins=True, margins_name="Total")
+    crosstab_display = mo.md("**Contingency Table** — Cost of Debt (row) vs. Risk Zone (col):\n\n" + _ct.to_markdown())
     return box_chart, crosstab_display, reg_summary, scatter_chart
 
 
+# ---------------------------------------------------------------------------
+# CELL 10: NLP
+# ---------------------------------------------------------------------------
 @app.cell
 def _(Counter, mo, pd, px, re, ui_nlp_min, ui_nlp_text):
-    # 8: NLP word and bigram frequency analysis (Wk10)
-
     _STOP = {
         "the","a","an","and","or","but","in","on","at","to","for","of","with",
         "from","is","are","was","were","be","been","by","as","it","its","this",
@@ -497,608 +413,185 @@ def _(Counter, mo, pd, px, re, ui_nlp_min, ui_nlp_text):
     _bigs  = [f"{_toks[i]} {_toks[i+1]}" for i in range(len(_toks)-1)]
     _bc    = Counter(_bigs)
     _mf    = ui_nlp_min.value
-
-    _dfu = pd.DataFrame([(w,c) for w,c in _uc.most_common(20) if c>=_mf],
-                        columns=["Word","Frequency"])
-    _dfb = pd.DataFrame([(b,c) for b,c in _bc.most_common(15) if c>=_mf],
-                        columns=["Bigram","Frequency"])
-
+    _dfu = pd.DataFrame([(w,c) for w,c in _uc.most_common(20) if c>=_mf], columns=["Word","Frequency"])
+    _dfb = pd.DataFrame([(b,c) for b,c in _bc.most_common(15) if c>=_mf], columns=["Bigram","Frequency"])
     if len(_dfu) > 0:
-        _fu = px.bar(_dfu, x="Frequency", y="Word", orientation="h",
-                     title="Top Unigrams", color="Frequency",
-                     color_continuous_scale="Blues",
-                     template="plotly_dark", height=360)
+        _fu = px.bar(_dfu, x="Frequency", y="Word", orientation="h", title="Top Unigrams",
+            color="Frequency", color_continuous_scale="Blues", template="plotly_dark", height=360)
         _fu.update_layout(yaxis=dict(autorange="reversed"), showlegend=False)
         nlp_uni = mo.ui.plotly(_fu)
     else:
         nlp_uni = mo.md("*No words found above the minimum frequency.*")
-
     if len(_dfb) > 0:
-        _fb = px.bar(_dfb, x="Frequency", y="Bigram", orientation="h",
-                     title="Top Bigrams", color="Frequency",
-                     color_continuous_scale="Teal",
-                     template="plotly_dark", height=320)
+        _fb = px.bar(_dfb, x="Frequency", y="Bigram", orientation="h", title="Top Bigrams",
+            color="Frequency", color_continuous_scale="Teal", template="plotly_dark", height=320)
         _fb.update_layout(yaxis=dict(autorange="reversed"), showlegend=False)
         nlp_big = mo.ui.plotly(_fb)
     else:
         nlp_big = mo.md("*No bigrams found above the minimum frequency.*")
-
-    nlp_stats = mo.md(
-        f"**{len(_uc)}** unique words · **{len(_bc)}** unique bigrams · "
-        f"Showing frequency ≥ **{_mf}**"
-    )
+    nlp_stats = mo.md(f"**{len(_uc)}** unique words · **{len(_bc)}** unique bigrams · Showing frequency ≥ **{_mf}**")
     return nlp_big, nlp_stats, nlp_uni
 
 
-@app.cell
-def _(mo):
-    # 9: Wk06-07 — Cookie acceptance UI controls
-    # Target URL and topic keywords the user can edit before running
-    ui_cookie_url = mo.ui.text(
-        value="https://www.siemens.com/global/en/company/",
-        label="Target website URL:",
-    )
-    ui_cookie_topics = mo.ui.text(
-        value="sustainability, ESG, environment, water, social, governance",
-        label="Filter keywords (comma-separated):",
-    )
-    ui_cookie_run = mo.ui.run_button(label="▶ Accept Cookies & Save Session")
-
-    cookie_controls = mo.vstack([
-        mo.md("""
-        #### ⚙️ Configuration
-
-        Set the website you want to visit and the keywords used to filter
-        the URLs found on the page. Then click **▶ Accept Cookies & Save Session**
-        to launch the headless browser pipeline.
-
-        > **Note:** Playwright and its Chromium browser must be installed in your
-        > environment. If running in GitHub Codespaces, run the following in a terminal
-        > once before executing this cell:
-        > ```bash
-        > pip install playwright playwright-stealth
-        > playwright install chromium
-        > ```
-        """),
-        mo.hstack([ui_cookie_url, ui_cookie_topics], justify="start", gap=4),
-        ui_cookie_run,
-    ])
-    return cookie_controls, ui_cookie_run, ui_cookie_topics, ui_cookie_url
-
-
-@app.cell
-async def _(mo, ui_cookie_run, ui_cookie_topics, ui_cookie_url):
-    # 10: Wk06-07 — Cookie acceptance and session storage
-    # Mirrors Wk06-07_1acceptNstoreCookies_Moodle.py exactly.
-    # Runs only when the user clicks the run button.
-
-    import asyncio
-    import os
-    import re as _re
-    import csv
-    import json
-    import time as _time
-
-    # ── Output placeholders shown before the button is clicked ────────────────
-    if not ui_cookie_run.value:
-        cookie_result = mo.callout(
-            mo.md("Click **▶ Accept Cookies & Save Session** above to run the pipeline."),
-            kind="info",
-        )
-        cookie_log = ""
-    else:
-        # ── Pull values from UI controls ───────────────────────────────────────
-        topLevelURL = ui_cookie_url.value.strip()
-        topics = [t.strip() for t in ui_cookie_topics.value.split(",") if t.strip()]
-
-        # ── JavaScript: check whether the cookie banner is visible ─────────────
-        # Looks inside the shadow DOM for an "Accept All" button
-        script_check_banner = """
-        () => {
-            const shadowRoot = document.querySelector('#usercentrics-root')?.shadowRoot;
-            if (shadowRoot) {
-                const shadowButtons = Array.from(shadowRoot.querySelectorAll('button'));
-                const shadowAcceptButton = shadowButtons.find(button =>
-                    button.textContent.includes('Accept All') ||
-                    button.textContent.includes('Accept all') ||
-                    button.innerText.includes('Accept All') ||
-                    button.innerText.includes('Accept all')
-                );
-                return shadowAcceptButton ? true : false;
-            }
-            return false;
-        }
-        """
-
-        # ── JavaScript: find and click the Accept All button ──────────────────
-        # Searches both the main page and the shadow DOM
-        script_click = """
-        () => {
-            let result = '';
-            const buttons = Array.from(document.querySelectorAll('button'));
-            const acceptButton = buttons.find(button =>
-                button.textContent.includes('Accept All') ||
-                button.textContent.includes('Accept all') ||
-                button.innerText.includes('Accept All') ||
-                button.innerText.includes('Accept all')
-            );
-            if (acceptButton) {
-                acceptButton.click();
-                result += ' acceptButton clicked ';
-            }
-            const shadowRoot = document.querySelector('#usercentrics-root')?.shadowRoot;
-            if (shadowRoot) {
-                const shadowButtons = Array.from(shadowRoot.querySelectorAll('button'));
-                const shadowAcceptButton = shadowButtons.find(button =>
-                    button.textContent.includes('Accept All') ||
-                    button.textContent.includes('Accept all') ||
-                    button.innerText.includes('Accept All') ||
-                    button.innerText.includes('Accept all')
-                );
-                if (shadowAcceptButton) {
-                    shadowAcceptButton.click();
-                    result += ' shadowAcceptButton clicked ';
-                }
-            }
-            return result || 'no button clicked';
-        }
-        """
-
-        # ── Helper: click the banner and confirm it is gone ───────────────────
-        async def click_accept_cookies(page):
-            try:
-                initial_banner_present = await page.evaluate(script_check_banner)
-                click_result = await page.evaluate(script_click)
-                if "clicked" not in click_result:
-                    return False, "Could not find cookie accept button"
-                await asyncio.sleep(1)
-                banner_still_present = await page.evaluate(script_check_banner)
-                if not banner_still_present:
-                    return True, f"Banner dismissed (click result: {click_result.strip()})"
-                else:
-                    return False, "Banner still present after click attempt"
-            except Exception as e:
-                return False, f"Error in click_accept_cookies: {e}"
-
-        # ── Main pipeline ──────────────────────────────────────────────────────
-        log_lines = []
-
-        try:
-            from playwright.async_api import async_playwright
-
-            os.makedirs("public/crawl", exist_ok=True)
-
-            async with async_playwright() as p:
-                browser = await p.chromium.launch(
-                    headless=False,
-                    args=[
-                        "--headless=new",
-                        "--disable-blink-features=AutomationControlled",
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-dev-shm-usage",
-                        "--no-first-run",
-                        "--no-zygote",
-                        "--disable-gpu",
-                        "--window-position=0,0",
-                    ],
-                )
-
-                # ── Context 1: bare browser (demonstrates bot detection) ───────
-                log_lines.append("**Context 1 (bare browser):** launching...")
-                context_bare = await browser.new_context()
-                page_bare = await context_bare.new_page()
-                try:
-                    await page_bare.goto(
-                        topLevelURL, wait_until="domcontentloaded", timeout=15000
-                    )
-                except Exception:
-                    pass
-                await page_bare.screenshot(
-                    path="public/crawl/screenshot_BotDetected.png", full_page=True
-                )
-                log_lines.append("→ Screenshot saved: `screenshot_BotDetected.png` *(bot-blocked view)*")
-                await context_bare.close()
-
-                # ── Context 2: evasion browser ────────────────────────────────
-                log_lines.append("**Context 2 (evasion browser):** applying patches...")
-                context_evasion = await browser.new_context(
-                    # Chrome 133 on Windows 10 — must match the platform patch below
-                    user_agent=(
-                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/133.0.0.0 Safari/537.36"
-                    ),
-                    viewport={"width": 1920, "height": 1080},
-                    locale="en-US",
-                    timezone_id="Europe/Berlin",
-                    device_scale_factor=1,
-                )
-
-                # Patches injected before any page JS runs:
-                # 1. Hide navigator.webdriver (tells sites this is automated)
-                # 2. Fix platform mismatch (Codespaces = Linux, UA = Windows)
-                # 3. Fake plugins list (headless has 0, real Chrome has some)
-                # 4. Add window.chrome object (missing in headless mode)
-                await context_evasion.add_init_script("""
-                    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-                    Object.defineProperty(navigator, 'platform',  { get: () => 'Win32'    });
-                    Object.defineProperty(navigator, 'plugins',   { get: () => [1,2,3,4,5]});
-                    window.chrome = { runtime: {} };
-                """)
-
-                page = await context_evasion.new_page()
-
-                log_lines.append(f"→ Navigating to `{topLevelURL}`...")
-                t0 = _time.time()
-                try:
-                    await page.goto(
-                        topLevelURL, wait_until="domcontentloaded", timeout=60000
-                    )
-                    await page.wait_for_selector("body", timeout=10000)
-                    await asyncio.sleep(5)
-                except Exception as e:
-                    log_lines.append(f"⚠️ Page load warning: {e}")
-
-                load_time = round(_time.time() - t0, 2)
-                log_lines.append(f"→ Page loaded in {load_time}s")
-
-                await page.screenshot(
-                    path="public/crawl/screenshot_CookiesPopup.png", full_page=True
-                )
-                log_lines.append("→ Screenshot saved: `screenshot_CookiesPopup.png` *(before accepting)*")
-
-                # Accept the cookie banner
-                success, msg = await click_accept_cookies(page)
-                log_lines.append(
-                    f"→ Cookie banner: {'✅ dismissed' if success else '⚠️ ' + msg}"
-                )
-
-                await asyncio.sleep(3)
-                await page.screenshot(
-                    path="public/crawl/screenshot_CookiesAccepted.png", full_page=True
-                )
-                log_lines.append("→ Screenshot saved: `screenshot_CookiesAccepted.png` *(after accepting)*")
-
-                # Extract and filter URLs
-                urls = await page.evaluate(
-                    "() => Array.from(document.querySelectorAll('a')).map(a => a.href)"
-                )
-                filtered_urls = [
-                    url for url in urls
-                    if any(
-                        _re.search(kw.replace("_", "[_-]"), url, _re.IGNORECASE)
-                        for kw in topics
-                    )
-                ]
-
-                with open("public/crawl/urls_raw.csv", "w", newline="", encoding="utf-8") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["URL"])
-                    writer.writerows([[u] for u in urls])
-
-                with open("public/crawl/urls_filtered.csv", "w", newline="", encoding="utf-8") as f:
-                    writer = csv.writer(f)
-                    writer.writerow(["URL"])
-                    writer.writerows([[u] for u in filtered_urls])
-
-                log_lines.append(
-                    f"→ URLs saved: **{len(urls)}** raw · **{len(filtered_urls)}** filtered"
-                )
-
-                # Save cookies and local storage
-                cookies = await context_evasion.cookies()
-                with open("cookies.json", "w", encoding="utf-8") as f:
-                    json.dump(cookies, f, indent=2)
-
-                try:
-                    local_storage = await page.evaluate("() => JSON.stringify(localStorage)")
-                    with open("localStorage.json", "w", encoding="utf-8") as f:
-                        f.write(local_storage)
-                except Exception:
-                    pass
-
-                log_lines.append(
-                    f"→ Session saved: `cookies.json` ({len(cookies)} cookies) · `localStorage.json`"
-                )
-
-                await browser.close()
-                log_lines.append("✅ **Pipeline complete.** Browser closed.")
-
-            cookie_result = mo.callout(
-                mo.md(
-                    "**Session saved successfully.** The files below are ready for use "
-                    "by the URL-collection and PDF-download notebooks:\n\n"
-                    "| File | Contents |\n"
-                    "|---|---|\n"
-                    "| `cookies.json` | Browser session cookies |\n"
-                    "| `localStorage.json` | Browser local storage |\n"
-                    "| `public/crawl/urls_raw.csv` | All links found on the page |\n"
-                    "| `public/crawl/urls_filtered.csv` | Topic-filtered links |\n"
-                    "| `public/crawl/screenshot_BotDetected.png` | Bare browser (blocked) |\n"
-                    "| `public/crawl/screenshot_CookiesPopup.png` | Before accepting |\n"
-                    "| `public/crawl/screenshot_CookiesAccepted.png` | After accepting |\n"
-                ),
-                kind="success",
-            )
-
-        except ImportError:
-            log_lines.append(
-                "❌ **Playwright not installed.** Run in a terminal:\n"
-                "```bash\npip install playwright playwright-stealth\n"
-                "playwright install chromium\n```"
-            )
-            cookie_result = mo.callout(
-                mo.md("**Playwright not found.** See the log below for installation instructions."),
-                kind="warn",
-            )
-        except Exception as e:
-            log_lines.append(f"❌ Pipeline error: {e}")
-            cookie_result = mo.callout(
-                mo.md(f"**Pipeline failed:** {e}"),
-                kind="danger",
-            )
-
-        cookie_log = "\n\n".join(f"- {line}" for line in log_lines)
-
-    cookie_section = mo.vstack([
-        cookie_result,
-        mo.md("#### 📋 Run Log"),
-        mo.md(cookie_log) if cookie_log else mo.md("*No log yet.*"),
-    ])
-
-    return cookie_section, cookie_log, cookie_result
-
-
+# ---------------------------------------------------------------------------
+# CELL 11: Portfolio assembly.
+# Depends on cookie_state — renders nothing until user makes a choice.
+# Uses mo.vstack throughout (NOT mo.md(f"...{widget}...")) so all
+# interactive elements render correctly in WASM.
+# ---------------------------------------------------------------------------
 @app.cell
 def _(
-    box_chart, cookie_controls, cookie_section, crosstab_display,
-    ko_hist, ko_summary, ko_tornado,
-    mo, nlp_big, nlp_stats, nlp_uni,
-    reg_summary, scatter_chart,
-    ui_ca, ui_cl, ui_eb, ui_mc, ui_re, ui_sal,
-    ui_sectors, ui_ta, ui_tl, ui_years,
-    ui_nlp_min, ui_nlp_text,
-    z_display,
+    box_chart, cookie_state, crosstab_display, ko_hist, ko_summary, ko_tornado,
+    mo, nlp_big, nlp_stats, nlp_uni, reg_summary, scatter_chart,
+    ui_ca, ui_cl, ui_eb, ui_mc, ui_re, ui_sal, ui_sectors, ui_ta, ui_tl,
+    ui_years, ui_nlp_min, ui_nlp_text, z_display,
 ):
-    # 11: Assemble the multi-tabbed portfolio
-    # Demonstrates: Wk04 — mo.ui.tabs, mo.vstack, mo.hstack, mo.callout
+    if cookie_state is None:
+        # Not chosen yet — render nothing
+        _out = mo.md("")
+    else:
+        # ── Tab 1: About Me ───────────────────────────────────────────────
+        tab_about = mo.md("""
+### BSc Accounting & Finance | Data, AI & Finance Enthusiast
 
-    # ── Tab 1: About Me ───────────────────────────────────────────────────────
-    tab_about = mo.md("""
-    ### BSc Accounting & Finance | Data, AI & Finance Enthusiast
-
-    **Summary:**
-    - Motivated BSc Accounting & Finance student at Bayes Business School (Predicted: **1st Class**).
-    - Independent investment book yielding **90%+ net profit**.
-    - Shadowed a Partner at a boutique hedge fund overseeing **£500M+ in fixed-income assets**.
-    - Independently designed and deployed **NutriScan AI** — a live Firebase/Groq PWA,
-      currently in initial beta testing. Applies LLM API skills from Week 09 of AF1204.
-    - Actively contributing to a Fintech startup (FX solutions) — assisting with
-      funding, design, and testing.
-
-    ---
-
-    **Education:**
-
-    * **BSc Accounting & Finance (Hons)**, Bayes Business School *(Sep 2025 – May 2028)*
-      — Predicted: **1st Class**
-    * **Bloomberg Market Concept (BMC) Certificate** *(Oct – Dec 2025)*
-    * **John Lyon School** — A: Maths · B: Chemistry · C: Biology · 10 GCSEs at 9–7
-
-    ---
-
-    **Technical Skills:**
-
-    | Category | Tools |
-    |---|---|
-    | Programming | Python · Jupyter Notebook · Marimo |
-    | Data & Visualisation | Pandas · NumPy · Plotly · Altair · SciPy |
-    | Statistical Methods | OLS Regression · Monte Carlo · DCF Modelling · Hypothesis Testing |
-    | Web & AI | Playwright · spaCy NLP · Groq · Firebase · LLM APIs |
-    | Finance Tools | yfinance · PyMuPDF · EViews · Bloomberg Terminal |
-
-    ---
-
-    **Work Experience:**
-
-    * **Tutor**, Sherpa *(Jul 2025 – Present)*
-      — GCSE and A-Level Maths and Sciences; improved student grades by at least one level
-    * **Data & Operations Analyst**, Nice Smile Dental Practice *(Jul – Sep 2025)*
-      — Reduced weekly reporting time by 1.5 hours; improved data accuracy by 17%;
-        boosted new patient volume by 15%
-    * **Investment Banking Shadow**, Observatory Capital Management LLP *(Jul – Sep 2022)*
-      — Fixed-income research for £500M+ AUM portfolio; 96% data accuracy under tight deadlines
-    """)
-
-    # ── Tab 2: Passion Projects ───────────────────────────────────────────────
-    tab_projects = mo.vstack([
-
-        mo.md("## 📊 Passion Projects — Interactive Data Demos"),
-
-        # Demo 1: Z-Score (Wk01–02)
-        mo.md("### 📐 Demo 1: Altman Z-Score Calculator *(Weeks 01–02)*"),
-        mo.callout(mo.md(
-            "Enter company financials. The Z-Score updates **reactively** without "
-            "re-running the notebook — this is Marimo's **reactive cell system** (Week 02). "
-            "The `try/except` block (Week 01) handles zero liabilities gracefully, "
-            "returning `NaN` instead of crashing with a `ZeroDivisionError`."
-        ), kind="info"),
-        mo.hstack([
-            mo.vstack([ui_ta, ui_ca, ui_cl, ui_re]),
-            mo.vstack([ui_eb, ui_tl, ui_sal, ui_mc]),
-        ], justify="center", gap=4),
-        z_display,
-
-        mo.md("---"),
-
-        # Demo 2: Credit risk regression (Wk04 + Wk07–08)
-        mo.md("### 📉 Demo 2: Credit Risk Regression Analysis *(Weeks 04, 07–08)*"),
-        mo.callout(mo.md(
-            "Replicates the **Wk04_DataPreparation** methodology: OLS regression of "
-            "Average Cost of Debt on lagged Altman Z-Score with interactive filters. "
-            "Skills: `groupby().shift(1)` for lagged variables, `apply(lambda x: ...)` "
-            "for risk zone classification, `pd.crosstab()` for contingency analysis, "
-            "`np.polyfit` for the regression line, `scipy.stats.linregress` for R² and p-value."
-        ), kind="info"),
-        mo.hstack([ui_sectors, ui_years], justify="start", gap=4),
-        reg_summary,
-        scatter_chart,
-        mo.md("#### 📦 Distribution of Cost of Debt by Risk Zone"),
-        box_chart,
-        mo.md("#### 📋 Contingency Table (`pd.crosstab` + `apply/lambda`)"),
-        crosstab_display,
-
-        mo.md("---"),
-
-        # Demo 3: KO Monte Carlo (Self-exploration)
-        mo.md("### 🎯 Demo 3: Coca-Cola Acquisition — DCF Monte Carlo *(Self-exploration)*"),
-        mo.callout(mo.md(
-            "A fully independent project built outside AF1204. Runs a **10,000-iteration "
-            "Monte Carlo simulation** of a DCF valuation for Coca-Cola (KO), using "
-            "FY2024 10-K/SEC data as inputs. Six assumptions are sampled simultaneously "
-            "from statistical distributions (Normal + Triangular). "
-            "The model is **vectorised with NumPy** — significantly faster than the "
-            "original loop-based Jupyter version."
-        ), kind="info"),
-        ko_summary,
-        ko_hist,
-        mo.md("#### 🌪 Sensitivity Analysis — What Drives Value Most?"),
-        ko_tornado,
-    ])
-
-    # ── Tab 3: Technical Journey ──────────────────────────────────────────────
-    tab_technical = mo.vstack([
-
-        mo.md("## 🧠 Technical Journey — AF1204 Weeks 01 to 10"),
-
-        mo.md("""
-        | Week | Topic | Skills Demonstrated |
-        |---|---|---|
-        | 01 | Python Fundamentals | `try/except`, f-strings, `NaN` handling, function definitions |
-        | 02 | Marimo + yfinance | Reactive cells, `mo.ui.number`, live data fetch, Altair gauge |
-        | 02x | Panel Data | Nested loops, fiscal-year alignment, `time.sleep` rate limiting |
-        | 03 | Interactive Plotly | Violin, joyplot, 3D scatter, `zip()`, colour scales |
-        | 04 | Data Prep & Portfolio | `groupby().shift()`, `apply/lambda`, `pd.crosstab`, OLS, `mo.ui.tabs` |
-        | 06–07 | Web Scraping + OCR | Playwright `async/await`, shadow DOM evasion, PyMuPDF, Tesseract OCR |
-        | 08 | Statistical Analysis | OLS regression, R², p-value, `scipy.stats`, `statsmodels` |
-        | 09 | LLM API | Groq, multi-modal prompting, JSON response parsing |
-        | 10 | NLP & Word Clouds | spaCy transformer, bigrams, lemmatisation, `Counter`, word clouds |
-        """),
-
-        mo.md("---"),
-        mo.md("### 🧩 Live Demo: NLP Word & Bigram Frequency Analyser *(Week 10)*"),
-        mo.callout(mo.md(
-            "Applies the **tokenisation, stopword removal, and bigram counting** pipeline "
-            "from Week 10 — the same approach used on SEC 10-K Risk Factor sections for "
-            "the Magnificent 7 in `Wk10_BigramCloud_GPUorCPU_Moodle.py`. "
-            "Paste any financial text and adjust the minimum frequency slider."
-        ), kind="info"),
-        mo.hstack([ui_nlp_text, ui_nlp_min], justify="start", gap=2),
-        nlp_stats,
-        mo.hstack([nlp_uni, nlp_big], justify="start", gap=2),
-
-        mo.md("---"),
-        mo.md("""
-        ### 🌐 Weeks 06–07: Web Scraping & PDF Extraction Pipeline
-
-        | Notebook | Purpose | Key Techniques |
-        |---|---|---|
-        | `Wk06-07_1acceptNstoreCookies.py` | Visit site, bypass bot detection, accept cookies | `async/await`, shadow DOM, `navigator.webdriver` evasion |
-        | `Wk06-07_2collect_urls.py` | Crawl and filter ESG-related URLs | Playwright page scraping, regex URL filtering |
-        | `Wk06-07_3DLnExtract_OCR.py` | Download PDFs, extract keyword pages | PyMuPDF, Tesseract OCR fallback, `curl` for Akamai bypass |
-        """),
-
-        mo.md("### 🍪 Live Demo: Accept & Store Cookies *(Week 06-07, Part 1)*"),
-        mo.callout(mo.md(
-            "Replicates **`Wk06-07_1acceptNstoreCookies_Moodle.py`** exactly. "
-            "Launches a headless Chromium browser with bot-detection evasion "
-            "(`navigator.webdriver` patch, realistic user agent, platform/plugin spoofing), "
-            "navigates to the target site, dismisses the cookie consent banner via "
-            "**shadow DOM** inspection, and saves `cookies.json`, `localStorage.json`, "
-            "and filtered/raw URL CSVs — ready for the PDF download pipeline in Part 3."
-        ), kind="info"),
-        cookie_controls,
-        cookie_section,
-
-        mo.md("---"),
-        mo.md("""
-        ### 🤖 Week 09: LLM API — Applied via NutriScan AI
-
-        - Structured multi-modal prompts sent to **Groq** via OpenRouter
-        - JSON nutrition estimates parsed from image, label, and natural-language inputs
-        - Weekly personalised AI insight paragraphs generated for each user
-        """),
-    ])
-
-    # ── Tab 4: Personal Interests ─────────────────────────────────────────────
-    tab_interests = mo.vstack([
-        mo.md("""
-        ## ✨ Personal Projects & Interests
-
-        ### 📱 NutriScan AI — Live App *(Initial Beta Testing)*
-
-        An independently built **Progressive Web App (PWA)** using **Groq** AI
-        to scan meals from photos, labels, and barcodes — estimating calories and protein.
-
-        **Live:** [food-app-cb863.web.app](https://food-app-cb863.web.app/)
-
-        | Feature | Details |
-        |---|---|
-        | 📸 Photo scanning | AI estimates calories & protein from a plate photo |
-        | 🏷️ Label OCR | Reads nutrition values from packaged food labels |
-        | 📦 Barcode scanner | EAN/UPC lookup via Open Food Facts |
-        | ✍️ Natural language | "Bowl of pasta with chicken" — AI estimates macros |
-        | 🔥 Streak & Badges | 7-day tracker, 8 achievement badges |
-        | 📈 Progress charts | 14-day weight & body fat line charts |
-        | 🤖 Weekly AI insight | Personalised Groq paragraph about your week |
-        | ☁️ Cloud sync | Firebase Firestore for multi-device data |
-
-        **Stack:** Firebase Hosting · Firestore · Groq · OpenRouter · Vanilla JS
-
-        ---
-
-        ### 📈 10,000-Iteration Monte Carlo LBO Model (Coca-Cola)
-
-        See **Passion Projects → Demo 3** for the full live simulation.
-        Built from scratch using FY2024 KO 10-K/SEC data — full three-statement model
-        → DCF → 10,000-iteration Monte Carlo. *Tools: Python · NumPy · SciPy · Excel.*
-
-        ---
-
-        ### 📈 Independent Investment Portfolio
-
-        Personal investment book with **90%+ net profit** since inception.
-        Applies regression, DCF modelling, and time-series analysis using
-        Python, EViews, and Bloomberg Terminal.
-
-        ---
-
-        ### 🎯 Hobbies
-
-        🎹 Piano · ⚽ First-team football · 🏏 County Cup cricket ·
-        ♟ Regional chess · 🚴 Cycling
-        """),
-    ])
-
-    # ── Assemble tabs and display ─────────────────────────────────────────────
-    portfolio_tabs = mo.ui.tabs({
-        "📄 About Me":           tab_about,
-        "📊 Passion Projects":   tab_projects,
-        "🧠 Technical Journey":  tab_technical,
-        "✨ Personal Interests": tab_interests,
-    })
-
-    mo.md(
-        f"""
-# **Ibrahim Khan**
-### BSc Accounting & Finance · Bayes Business School · AF1204 Portfolio 2025/26
+**Summary:**
+- Motivated BSc Accounting & Finance student at Bayes Business School (Predicted: **1st Class**).
+- Independent investment book yielding **90%+ net profit**.
+- Shadowed a Partner at a boutique hedge fund overseeing **£500M+ in fixed-income assets**.
+- Independently designed and deployed **NutriScan AI** — a live Firebase/Groq PWA, currently in initial beta testing.
+- Actively contributing to a Fintech startup (FX solutions) — assisting with funding, design, and testing.
 
 ---
 
-{portfolio_tabs}
-        """
-    )
+**Education:**
+
+* **BSc Accounting & Finance (Hons)**, Bayes Business School *(Sep 2025 – May 2028)* — Predicted: **1st Class**
+* **Bloomberg Market Concept (BMC) Certificate** *(Oct – Dec 2025)*
+* **John Lyon School** — A: Maths · B: Chemistry · C: Biology · 10 GCSEs at 9–7
+
+---
+
+**Technical Skills:**
+
+| Category | Tools |
+|---|---|
+| Programming | Python · Jupyter Notebook · Marimo |
+| Data & Visualisation | Pandas · NumPy · Plotly · Altair · SciPy |
+| Statistical Methods | OLS Regression · Monte Carlo · DCF Modelling · Hypothesis Testing |
+| Web & AI | Playwright · spaCy NLP · Groq · Firebase · LLM APIs |
+| Finance Tools | yfinance · PyMuPDF · EViews · Bloomberg Terminal |
+
+---
+
+**Work Experience:**
+
+* **Tutor**, Sherpa *(Jul 2025 – Present)* — GCSE and A-Level Maths and Sciences
+* **Data & Operations Analyst**, Nice Smile Dental Practice *(Jul – Sep 2025)* — Reduced weekly reporting time by 1.5 hours; improved data accuracy by 17%
+* **Investment Banking Shadow**, Observatory Capital Management LLP *(Jul – Sep 2022)* — Fixed-income research for £500M+ AUM portfolio
+        """)
+
+        # ── Tab 2: Passion Projects ───────────────────────────────────────
+        tab_projects = mo.vstack([
+            mo.md("## 📊 Passion Projects — Interactive Data Demos"),
+            mo.md("### 📐 Demo 1: Altman Z-Score Calculator *(Weeks 01–02)*"),
+            mo.callout(mo.md(
+                "Enter company financials. The Z-Score updates **reactively** without re-running — "
+                "this is Marimo's **reactive cell system** (Week 02). The `try/except` block (Week 01) "
+                "handles zero liabilities gracefully."
+            ), kind="info"),
+            mo.hstack([
+                mo.vstack([ui_ta, ui_ca, ui_cl, ui_re]),
+                mo.vstack([ui_eb, ui_tl, ui_sal, ui_mc]),
+            ], justify="center", gap=4),
+            z_display,
+            mo.md("---"),
+            mo.md("### 📉 Demo 2: Credit Risk Regression Analysis *(Weeks 04, 07–08)*"),
+            mo.callout(mo.md(
+                "Replicates the **Wk04_DataPreparation** methodology: OLS regression of "
+                "Average Cost of Debt on lagged Altman Z-Score with interactive filters."
+            ), kind="info"),
+            mo.hstack([ui_sectors, ui_years], justify="start", gap=4),
+            reg_summary,
+            scatter_chart,
+            mo.md("#### 📦 Distribution of Cost of Debt by Risk Zone"),
+            box_chart,
+            mo.md("#### 📋 Contingency Table"),
+            crosstab_display,
+            mo.md("---"),
+            mo.md("### 🎯 Demo 3: Coca-Cola DCF Monte Carlo *(Self-exploration)*"),
+            mo.callout(mo.md(
+                "10,000-iteration Monte Carlo simulation of a DCF valuation for Coca-Cola (KO), "
+                "using FY2024 10-K/SEC data. Six assumptions sampled simultaneously from "
+                "statistical distributions. Vectorised with NumPy."
+            ), kind="info"),
+            ko_summary,
+            ko_hist,
+            mo.md("#### 🌪 Sensitivity Analysis"),
+            ko_tornado,
+            mo.md("---"),
+            mo.md("### 🧩 Demo 4: NLP Word & Bigram Frequency Analyser *(Week 10)*"),
+            mo.callout(mo.md(
+                "Applies the tokenisation, stopword removal, and bigram counting pipeline from Week 10."
+            ), kind="info"),
+            mo.hstack([ui_nlp_text, ui_nlp_min], justify="start", gap=2),
+            nlp_stats,
+            mo.hstack([nlp_uni, nlp_big], justify="start", gap=2),
+        ])
+
+        # ── Tab 3: Personal Interests ─────────────────────────────────────
+        tab_interests = mo.vstack([
+            mo.md("""
+## ✨ Personal Projects & Interests
+
+### 📱 NutriScan AI — Live App *(Initial Beta Testing)*
+
+An independently built **Progressive Web App (PWA)** using **Groq** AI to scan meals from photos, labels, and barcodes.
+
+**Live:** [food-app-cb863.web.app](https://food-app-cb863.web.app/)
+
+| Feature | Details |
+|---|---|
+| 📸 Photo scanning | AI estimates calories & protein from a plate photo |
+| 🏷️ Label OCR | Reads nutrition values from packaged food labels |
+| 📦 Barcode scanner | EAN/UPC lookup via Open Food Facts |
+| ✍️ Natural language | "Bowl of pasta with chicken" — AI estimates macros |
+| 🔥 Streak & Badges | 7-day tracker, 8 achievement badges |
+| 📈 Progress charts | 14-day weight & body fat line charts |
+| 🤖 Weekly AI insight | Personalised Groq paragraph about your week |
+| ☁️ Cloud sync | Firebase Firestore for multi-device data |
+
+**Stack:** Firebase Hosting · Firestore · Groq · OpenRouter · Vanilla JS
+
+---
+
+### 📈 Independent Investment Portfolio
+
+Personal investment book with **90%+ net profit** since inception.
+Applies regression, DCF modelling, and time-series analysis using Python, EViews, and Bloomberg Terminal.
+
+---
+
+### 🎯 Hobbies
+
+🎹 Piano · ⚽ First-team football · 🏏 County Cup cricket · ♟ Regional chess · 🚴 Cycling
+            """),
+        ])
+
+        # ── Assemble — use mo.vstack, NOT mo.md(f"...{tabs}...") ─────────
+        _tabs = mo.ui.tabs({
+            "📄 About Me":           tab_about,
+            "📊 Passion Projects":   tab_projects,
+            "✨ Personal Interests": tab_interests,
+        })
+
+        _out = mo.vstack([
+            mo.md("# **Ibrahim Khan**"),
+            mo.md("### BSc Accounting & Finance · Bayes Business School · AF1204 Portfolio 2025/26"),
+            mo.md("---"),
+            _tabs,
+        ])
+
+    _out
 
 
 if __name__ == "__main__":
