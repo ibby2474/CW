@@ -177,7 +177,7 @@ def _(go, mo, np):
     ko_p_below50 = float(np.mean(ev_per_share < 50) * 100)
     fig_ko = go.Figure()
     fig_ko.add_trace(go.Histogram(x=ev_per_share, nbinsx=80,
-        marker_color="rgba(52,152,219,0.7)", marker_line=dict(width=0.3, color="white"),
+        marker_color="rgba(52,152,219,0.7)", marker_line=dict(width=0.3, color="#2c3e50"),
         name="Simulated values"))
     for _x0, _x1, _col in [
         (ko_p5,  ko_p25, "rgba(231,76,60,0.12)"),
@@ -186,18 +186,18 @@ def _(go, mo, np):
     ]:
         fig_ko.add_vrect(x0=_x0, x1=_x1, fillcolor=_col, layer="below", line_width=0)
     for _v, _c, _lbl, _d in [
-        (ko_p50,  "white",  f"Median ${ko_p50:.2f}",   "solid"),
-        (ko_mean, "yellow", f"Mean ${ko_mean:.2f}",     "dash"),
-        (ko_p5,   "red",    f"5th ${ko_p5:.2f}",        "dot"),
-        (ko_p95,  "green",  f"95th ${ko_p95:.2f}",      "dot"),
-        (68.19,   "orange", "Base Case $68.19",          "dashdot"),
+        (ko_p50,  "#2c3e50",  f"Median ${ko_p50:.2f}",   "solid"),
+        (ko_mean, "#f39c12", f"Mean ${ko_mean:.2f}",     "dash"),
+        (ko_p5,   "#e74c3c",    f"5th ${ko_p5:.2f}",        "dot"),
+        (ko_p95,  "#27ae60",  f"95th ${ko_p95:.2f}",      "dot"),
+        (68.19,   "#d35400", "Base Case $68.19",          "dashdot"),
     ]:
         fig_ko.add_vline(x=_v, line_color=_c, line_dash=_d, line_width=1.8,
             annotation_text=_lbl, annotation_font_color=_c, annotation_position="top")
     fig_ko.update_layout(
         title="KO Equity Value Per Share — 10,000 Monte Carlo Iterations",
         xaxis_title="Equity Value Per Share ($)", yaxis_title="Frequency",
-        template="plotly_dark", height=460, showlegend=False, bargap=0.02,
+        template="plotly_white", height=460, showlegend=False, bargap=0.02,
         xaxis=dict(range=[35, 100]))
     ko_hist = mo.as_html(fig_ko)
     import pandas as _pd2
@@ -210,8 +210,8 @@ def _(go, mo, np):
         marker_color=["#e74c3c" if v < 0 else "#2ecc71" for v in _sens["Impact"]]))
     fig_tornado.update_layout(
         title="Sensitivity — Impact on Equity Value Per Share ($)",
-        xaxis_title="Impact ($)", template="plotly_dark", height=320,
-        xaxis=dict(zeroline=True, zerolinecolor="white", zerolinewidth=1.5))
+        xaxis_title="Impact ($)", template="plotly_white", height=320,
+        xaxis=dict(zeroline=True, zerolinecolor="#2c3e50", zerolinewidth=1.5))
     ko_tornado = mo.as_html(fig_tornado)
     ko_summary = mo.md(f"""
 **Model:** Full three-statement financial model built from KO FY2024 10-K/SEC data
@@ -417,14 +417,14 @@ def _(Counter, mo, pd, px, re, ui_nlp_min, ui_nlp_text):
     _dfb = pd.DataFrame([(b,c) for b,c in _bc.most_common(15) if c>=_mf], columns=["Bigram","Frequency"])
     if len(_dfu) > 0:
         _fu = px.bar(_dfu, x="Frequency", y="Word", orientation="h", title="Top Unigrams",
-            color="Frequency", color_continuous_scale="Blues", template="plotly_dark", height=360)
+            color="Frequency", color_continuous_scale="Blues", template="plotly_white", height=360)
         _fu.update_layout(yaxis=dict(autorange="reversed"), showlegend=False)
         nlp_uni = mo.ui.plotly(_fu)
     else:
         nlp_uni = mo.md("*No words found above the minimum frequency.*")
     if len(_dfb) > 0:
         _fb = px.bar(_dfb, x="Frequency", y="Bigram", orientation="h", title="Top Bigrams",
-            color="Frequency", color_continuous_scale="Teal", template="plotly_dark", height=320)
+            color="Frequency", color_continuous_scale="Teal", template="plotly_white", height=320)
         _fb.update_layout(yaxis=dict(autorange="reversed"), showlegend=False)
         nlp_big = mo.ui.plotly(_fb)
     else:
@@ -452,14 +452,14 @@ def _(
     else:
         # ── Tab 1: About Me ───────────────────────────────────────────────
         tab_about = mo.md("""
-### BSc Accounting & Finance | Data, AI & Finance Enthusiast
+### BSc Accounting & Finance · Data, AI & Finance
 
 **Summary:**
-- Motivated BSc Accounting & Finance student at Bayes Business School (Predicted: **1st Class**).
-- Independent investment book yielding **90%+ net profit**.
-- Shadowed a Partner at a boutique hedge fund overseeing **£500M+ in fixed-income assets**.
-- Independently designed and deployed **NutriScan AI** — a live Firebase/Groq PWA, currently in initial beta testing.
-- Actively contributing to a Fintech startup (FX solutions) — assisting with funding, design, and testing.
+- BSc Accounting & Finance student at Bayes Business School (Predicted: **1st Class**).
+- Running an independent personal investment portfolio since inception.
+- Observed fixed-income research at a boutique hedge fund (£500M+ AUM).
+- Designed and deployed **NutriScan AI** - a live Firebase/Groq Progressive Web App, currently in beta testing.
+- Contributing to a fintech startup in the FX space (funding support, design, and UAT).
 
 ---
 
@@ -475,11 +475,11 @@ def _(
 
 | Category | Tools |
 |---|---|
-| Programming | Python · Jupyter Notebook · Marimo |
-| Data & Visualisation | Pandas · NumPy · Plotly · Altair · SciPy |
-| Statistical Methods | OLS Regression · Monte Carlo · DCF Modelling · Hypothesis Testing |
-| Web & AI | Playwright · spaCy NLP · Groq · Firebase · LLM APIs |
-| Finance Tools | yfinance · PyMuPDF · EViews · Bloomberg Terminal |
+| Languages | Python · R · SQL |
+| Libraries | pandas · NumPy · Plotly · Altair · SciPy · statsmodels · spaCy |
+| Platforms | Bloomberg Terminal · EViews · Jupyter · Marimo |
+| Methods | OLS Regression · Monte Carlo · DCF Modelling · Hypothesis Testing |
+| Web & AI | Playwright · Firebase · Groq · LLM APIs |
 
 ---
 
@@ -487,17 +487,17 @@ def _(
 
 * **Tutor**, Sherpa *(Jul 2025 – Present)* — GCSE and A-Level Maths and Sciences
 * **Data & Operations Analyst**, Nice Smile Dental Practice *(Jul – Sep 2025)* — Reduced weekly reporting time by 1.5 hours; improved data accuracy by 17%
-* **Investment Banking Shadow**, Observatory Capital Management LLP *(Jul – Sep 2022)* — Fixed-income research for £500M+ AUM portfolio
+* **Investment Banking Shadow**, Observatory Capital Management LLP *(Jul – Sep 2022)* — Observed fixed-income research process at a £500M+ AUM fund
         """)
 
-        # ── Tab 2: Passion Projects ───────────────────────────────────────
+        # ── Tab 2: Interactive Demos ──────────────────────────────────────
         tab_projects = mo.vstack([
-            mo.md("## 📊 Passion Projects — Interactive Data Demos"),
-            mo.md("### 📐 Demo 1: Altman Z-Score Calculator *(Weeks 01–02)*"),
+            mo.md("## Interactive Demos"),
+            mo.md("### Demo 1: Altman Z-Score Calculator"),
             mo.callout(mo.md(
-                "Enter company financials. The Z-Score updates **reactively** without re-running — "
-                "this is Marimo's **reactive cell system** (Week 02). The `try/except` block (Week 01) "
-                "handles zero liabilities gracefully."
+                "The Altman Z-Score predicts bankruptcy risk from five balance-sheet ratios. "
+                "Values below 1.81 indicate financial distress; values above 2.99 indicate a safe zone. "
+                "Enter financials below - the score updates live."
             ), kind="info"),
             mo.hstack([
                 mo.vstack([ui_ta, ui_ca, ui_cl, ui_re]),
@@ -505,20 +505,21 @@ def _(
             ], justify="center", gap=4),
             z_display,
             mo.md("---"),
-            mo.md("### 📉 Demo 2: Credit Risk Regression Analysis *(Weeks 04, 07–08)*"),
+            mo.md("### Demo 2: Credit Risk Regression Analysis"),
             mo.callout(mo.md(
-                "Replicates the **Wk04_DataPreparation** methodology: OLS regression of "
-                "Average Cost of Debt on lagged Altman Z-Score with interactive filters."
+                "OLS regression of average cost of debt on lagged Altman Z-Score. "
+                "Tests whether prior-year credit risk predicts current borrowing costs across a "
+                "synthetic panel of 60 firms over four years. Filter by sector and year to explore subsets."
             ), kind="info"),
             mo.hstack([ui_sectors, ui_years], justify="start", gap=4),
             reg_summary,
             scatter_chart,
-            mo.md("#### 📦 Distribution of Cost of Debt by Risk Zone"),
+            mo.md("#### Distribution of Cost of Debt by Risk Zone"),
             box_chart,
-            mo.md("#### 📋 Contingency Table"),
+            mo.md("#### Contingency Table"),
             crosstab_display,
             mo.md("---"),
-            mo.md("### 🎯 Demo 3: Coca-Cola DCF Monte Carlo *(Self-exploration)*"),
+            mo.md("### Demo 3: Coca-Cola DCF Monte Carlo"),
             mo.callout(mo.md(
                 "10,000-iteration Monte Carlo simulation of a DCF valuation for Coca-Cola (KO), "
                 "using FY2024 10-K/SEC data. Six assumptions sampled simultaneously from "
@@ -526,12 +527,14 @@ def _(
             ), kind="info"),
             ko_summary,
             ko_hist,
-            mo.md("#### 🌪 Sensitivity Analysis"),
+            mo.md("#### Sensitivity Analysis"),
             ko_tornado,
             mo.md("---"),
-            mo.md("### 🧩 Demo 4: NLP Word & Bigram Frequency Analyser *(Week 10)*"),
+            mo.md("### Demo 4: NLP Word & Bigram Frequency Analyser"),
             mo.callout(mo.md(
-                "Applies the tokenisation, stopword removal, and bigram counting pipeline from Week 10."
+                "Paste any financial or business text below. The tool tokenises the input, "
+                "removes stopwords, and ranks the most frequent unigrams and bigrams - "
+                "a common first step in analysing 10-K risk factor disclosures or earnings transcripts."
             ), kind="info"),
             mo.hstack([ui_nlp_text, ui_nlp_min], justify="start", gap=2),
             nlp_stats,
@@ -541,9 +544,9 @@ def _(
         # ── Tab 3: Personal Interests ─────────────────────────────────────
         tab_interests = mo.vstack([
             mo.md("""
-## ✨ Personal Projects & Interests
+## Personal Projects & Interests
 
-### 📱 NutriScan AI — Live App *(Initial Beta Testing)*
+### NutriScan AI - Live App *(Beta Testing)*
 
 An independently built **Progressive Web App (PWA)** using **Groq** AI to scan meals from photos, labels, and barcodes.
 
@@ -551,42 +554,46 @@ An independently built **Progressive Web App (PWA)** using **Groq** AI to scan m
 
 | Feature | Details |
 |---|---|
-| 📸 Photo scanning | AI estimates calories & protein from a plate photo |
-| 🏷️ Label OCR | Reads nutrition values from packaged food labels |
-| 📦 Barcode scanner | EAN/UPC lookup via Open Food Facts |
-| ✍️ Natural language | "Bowl of pasta with chicken" — AI estimates macros |
-| 🔥 Streak & Badges | 7-day tracker, 8 achievement badges |
-| 📈 Progress charts | 14-day weight & body fat line charts |
-| 🤖 Weekly AI insight | Personalised Groq paragraph about your week |
-| ☁️ Cloud sync | Firebase Firestore for multi-device data |
+| Photo scanning | AI estimates calories and protein from a plate photo |
+| Label OCR | Reads nutrition values from packaged food labels |
+| Barcode scanner | EAN/UPC lookup via Open Food Facts |
+| Natural language | "Bowl of pasta with chicken" - AI estimates macros |
+| Streak and badges | 7-day tracker, 8 achievement badges |
+| Progress charts | 14-day weight and body fat line charts |
+| Weekly AI insight | Personalised Groq paragraph about your week |
+| Cloud sync | Firebase Firestore for multi-device data |
 
 **Stack:** Firebase Hosting · Firestore · Groq · OpenRouter · Vanilla JS
 
 ---
 
-### 📈 Independent Investment Portfolio
+### Independent Investment Portfolio
 
-Personal investment book with **90%+ net profit** since inception.
-Applies regression, DCF modelling, and time-series analysis using Python, EViews, and Bloomberg Terminal.
+Personal investment book running since inception. Applies regression, DCF modelling, and time-series analysis using Python, EViews, and Bloomberg Terminal.
 
 ---
 
-### 🎯 Hobbies
+### Hobbies
 
-🎹 Piano · ⚽ First-team football · 🏏 County Cup cricket · ♟ Regional chess · 🚴 Cycling
+Piano · First-team football · County Cup cricket · Regional chess · Cycling
             """),
         ])
 
         # ── Assemble — use mo.vstack, NOT mo.md(f"...{tabs}...") ─────────
         _tabs = mo.ui.tabs({
-            "📄 About Me":           tab_about,
-            "📊 Passion Projects":   tab_projects,
-            "✨ Personal Interests": tab_interests,
+            "About":              tab_about,
+            "Interactive Demos":  tab_projects,
+            "Personal Projects":  tab_interests,
         })
 
         _out = mo.vstack([
             mo.md("# **Ibrahim Khan**"),
-            mo.md("### BSc Accounting & Finance · Bayes Business School · AF1204 Portfolio 2025/26"),
+            mo.md(
+                "**BSc Accounting & Finance · Bayes Business School**  \n"
+                "[LinkedIn](https://www.linkedin.com/in/ibrahim-khan) · "
+                "[GitHub](https://github.com/ibby2474) · "
+                "[Email](mailto:ibrahim.khan@example.com)"
+            ),
             mo.md("---"),
             _tabs,
         ])
