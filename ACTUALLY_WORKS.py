@@ -42,6 +42,40 @@ def _():
 
 
 # ---------------------------------------------------------------------------
+# CELL 1b: Inject custom CSS for page theming
+# ---------------------------------------------------------------------------
+@app.cell
+def _(mo):
+    _custom_css = mo.Html("""
+    <style>
+        /* Page background */
+        body, .marimo, #root, main {
+            background-color: #e8f0fa !important;
+        }
+        /* Cell backgrounds - keep transparent so page blue shows through */
+        .cell, .marimo-cell, [data-cell-id] {
+            background-color: transparent !important;
+        }
+        /* Tables get a white card background for readability */
+        table {
+            background-color: #ffffff !important;
+            border-radius: 4px;
+        }
+        /* Tab container sits on the blue, but tab content gets a white card */
+        [role="tabpanel"] {
+            background-color: #ffffff !important;
+            padding: 24px !important;
+            border-radius: 6px !important;
+            margin-top: 8px !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+    """)
+    _custom_css
+    return
+
+
+# ---------------------------------------------------------------------------
 # CELL 2: Cookie dropdown — defined here, displayed in Cell 3
 # ---------------------------------------------------------------------------
 @app.cell
@@ -590,9 +624,9 @@ Piano · First-team football · County Cup cricket · Regional chess · Cycling
             mo.md("# **Ibrahim Khan**"),
             mo.md(
                 "**BSc Accounting & Finance · Bayes Business School**  \n"
-                "[LinkedIn](https://www.linkedin.com/in/ibrahim-khan-68396129a/) · "
-                "[GitHub](https://github.com/BayesUG-AI/repoAF1204-ibby2474) · "
-                "[Email](Ibrahim.Khan.6@bayes.city.ac.uk)"
+                "[LinkedIn](https://www.linkedin.com/in/ibrahim-khan) · "
+                "[GitHub](https://github.com/ibby2474) · "
+                "[Email](mailto:ibrahim.khan@example.com)"
             ),
             mo.md("---"),
             _tabs,
