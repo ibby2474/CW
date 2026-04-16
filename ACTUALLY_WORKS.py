@@ -590,9 +590,9 @@ Piano · First-team football · County Cup cricket · Regional chess · Cycling
             mo.md("# **Ibrahim Khan**"),
             mo.md(
                 "**BSc Accounting & Finance · Bayes Business School**  \n"
-                "[LinkedIn](https://www.linkedin.com/in/ibrahim-khan) · "
-                "[GitHub](https://github.com/ibby2474) · "
-                "[Email](mailto:ibrahim.khan@example.com)"
+                "[LinkedIn](https://www.linkedin.com/in/ibrahim-khan-68396129a/) · "
+                "[GitHub](https://github.com/BayesUG-AI/repoAF1204-ibby2474) · "
+                "[Email](Ibrahim.Khan.6@bayes.city.ac.uk)"
             ),
             mo.md("---"),
             _tabs,
